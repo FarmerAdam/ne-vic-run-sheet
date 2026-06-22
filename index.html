@@ -1,0 +1,2177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NE Vic Run Sheet</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800&family=Poppins:wght@900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --brand: #f5c842;
+    --brand-dark: #d4a012;
+    --amber: #7a4e10;
+    --amber-on-white: #5a3608;
+    --amber-light: #fef6d8;
+    --green: #3B6D11;
+    --green-light: #EAF3DE;
+    --green-mid: #639922;
+    --red: #A32D2D;
+    --red-light: #FCEBEB;
+    --gray: #5F5E5A;
+    --gray-light: #F1EFE8;
+    --gray-border: #D3D1C7;
+    --text: #2C2C2A;
+    --text-muted: #888780;
+    --white: #ffffff;
+    --bg: #fdf9ee;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* NAV */
+  .top-bar { background: var(--brand); padding: 0; display: flex; align-items: stretch; }
+  .top-bar h1 { color: var(--amber-on-white); font-size: 17px; font-weight: 900; font-family: 'Poppins', sans-serif; padding: 14px 20px; letter-spacing: 0.3px; flex: 1; }
+  .top-bar .role-switcher { display: flex; }
+  .top-bar .role-btn { background: none; border: none; color: rgba(90,54,8,0.6); font-size: 13px; font-weight: 800; padding: 0 16px; cursor: pointer; border-left: 1px solid rgba(90,54,8,0.15); transition: background 0.15s; }
+  .top-bar .role-btn.active { color: var(--amber-on-white); background: rgba(90,54,8,0.12); font-weight: 800; }
+  .top-bar .role-btn:hover { background: rgba(90,54,8,0.08); }
+
+  /* VIEWS */
+  .view { display: none; padding: 20px; max-width: 860px; margin: 0 auto; }
+  .view.active { display: block; }
+
+  /* CARDS */
+  .card { background: var(--white); border: 1px solid var(--gray-border); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card-title .sub { font-size: 13px; font-weight: 400; color: var(--text-muted); }
+
+  /* STATUS BADGES */
+  .badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .badge-pending { background: var(--amber-light); color: var(--amber-on-white); }
+  .badge-ready { background: var(--green-light); color: var(--green); }
+  .badge-collected { background: #E6F1FB; color: #185FA5; }
+  .badge-flagged { background: var(--red-light); color: var(--red); }
+  .badge-delivered { background: var(--gray-light); color: var(--gray); }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 18px; border-radius: var(--radius); border: 1.5px solid var(--gray-border); background: var(--white); color: var(--text); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn:hover { background: var(--gray-light); }
+  .btn-primary { background: var(--brand); color: var(--amber-on-white); border-color: var(--brand-dark); font-weight: 800; }
+  .btn-primary:hover { background: var(--brand-dark); color: white; }
+  .btn-success { background: var(--green-light); color: var(--green); border-color: #C0DD97; }
+  .btn-success:hover { background: #d4eab0; }
+  .btn-danger { background: var(--red-light); color: var(--red); border-color: #F7C1C1; }
+  .btn-sm { padding: 7px 12px; font-size: 13px; }
+  .btn-lg { padding: 14px 24px; font-size: 16px; font-weight: 600; width: 100%; justify-content: center; margin-bottom: 10px; }
+
+  /* FORMS */
+  input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--gray-border); border-radius: var(--radius); font-size: 15px; background: var(--white); color: var(--text); margin-bottom: 10px; }
+  input:focus, select:focus { outline: 2px solid var(--brand); border-color: transparent; }
+  label { font-size: 13px; font-weight: 500; color: var(--text-muted); display: block; margin-bottom: 4px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+  /* RUN OVERVIEW */
+  .run-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .run-date { font-size: 22px; font-weight: 900; font-family: 'Poppins', sans-serif; color: var(--amber-on-white); }
+  .run-meta { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+  .run-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .run-pill { padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--gray-border); background: var(--white); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .run-pill.active { background: var(--brand); color: var(--amber-on-white); border-color: var(--brand-dark); font-weight: 800; }
+
+  /* ITEM ROWS */
+  .item-row { display: flex; align-items: flex-start; gap:12px; padding: 14px 0; border-bottom: 1px solid var(--gray-light); flex-wrap: wrap; }
+  .item-row:last-child { border-bottom: none; }
+  .item-info { flex: 1; min-width: 0; }
+  .item-name { font-size: 15px; font-weight: 500; }
+  .item-route { font-size: 13px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+  .item-qty { font-size: 20px; font-weight: 800; color: var(--amber-on-white); min-width: 32px; text-align: center; }
+  .item-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; align-items: flex-start; }
+
+  /* STOP LIST (driver) */
+  .stop-card { border-left: 4px solid var(--brand); padding-left: 16px; margin-bottom: 20px; }
+  .stop-name { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .stop-time { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+  .stop-card.stop-pickup { background: #EAF2FB; border-left-color: #185FA5; }
+  .stop-card.stop-drop { background: var(--amber-light); border-left-color: var(--amber); }
+
+  /* FLAG BADGE (animated) */
+  .item-row { position: relative; }
+  .item-row.has-flag { padding-top: 30px; }
+  .flag-corner { position: absolute; top: 4px; right: 0; left: 0; display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 11px; font-weight: 800; color: var(--red); cursor: pointer; }
+  .flag-corner .flag-wave { display: inline-block; font-size: 16px; transform-origin: 0% 100%; animation: flag-wave 1.4s ease-in-out infinite; }
+  @keyframes flag-wave { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(12deg); } 50% { transform: rotate(0deg); } 75% { transform: rotate(-6deg); } }
+
+  /* DRAG-AND-DROP STOP REORDERING */
+  .stop-card { cursor: grab; transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s; }
+  .stop-card.dragging { opacity: 0.4; cursor: grabbing; }
+  .stop-card.drag-over { box-shadow: 0 0 0 3px var(--brand-dark) inset; }
+  .stop-drag-handle { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 13px; font-weight: 700; margin-bottom: 2px; cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; }
+  .stop-drag-handle .grip { font-size: 16px; letter-spacing: -2px; }
+  .run-locked .stop-card { cursor: default; }
+  .run-locked .stop-drag-handle { display: none; }
+
+  /* RUN COMPLETION */
+  .run-complete-banner { background: var(--green-light); border: 1.5px solid #C0DD97; color: var(--green); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .complete-run-btn-wrap { margin: 20px 0; }
+
+  /* PROGRESS BAR */
+  .progress-bar { height: 6px; background: var(--gray-light); border-radius: 3px; margin: 8px 0 16px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--green-mid); border-radius: 3px; transition: width 0.4s; }
+
+  /* SECTION HEADERS */
+  .section-label { font-size: 11px; font-weight: 800; font-family: 'Nunito', sans-serif; text-transform: uppercase; letter-spacing: 0.8px; color: var(--amber); margin: 20px 0 10px; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 12px 20px; border-radius: var(--radius); font-size: 14px; font-weight: 500; z-index: 999; display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.18); }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+  .empty svg { margin-bottom: 12px; opacity: 0.3; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+
+  /* ADMIN: run builder */
+  .stops-builder .stop-entry { background: var(--gray-light); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; position: relative; }
+  .stops-builder .stop-entry h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  .remove-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; cursor: pointer; color: var(--red); font-size: 18px; line-height: 1; }
+
+  /* ALERT */
+  .alert { padding: 12px 16px; border-radius: var(--radius); font-size: 14px; margin-bottom: 16px; }
+  .alert-warning { background: var(--amber-light); color: var(--amber); border: 1px solid #FAC775; }
+  .alert-info { background: #E6F1FB; color: #185FA5; border: 1px solid #B5D4F4; }
+
+  /* HUB ready toggle */
+  .ready-toggle { display: flex; align-items: center; justify-content: space-between; padding: 16px; background: var(--gray-light); border-radius: var(--radius); margin-bottom: 16px; }
+  .ready-toggle span { font-size: 15px; font-weight: 500; }
+
+  /* HUB STATUS BAR */
+  .hub-status-bar { background: var(--white); border: 1.5px solid var(--gray-border); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
+  .hub-status-steps { display: flex; align-items: center; gap: 0; margin-bottom: 10px; }
+  .hub-status-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; }
+  .hub-status-step:not(:last-child)::after { content: ''; position: absolute; top: 16px; left: 60%; width: 80%; height: 3px; background: var(--gray-border); z-index: 0; }
+  .hub-status-step.done:not(:last-child)::after { background: var(--green-mid); }
+  .hub-step-dot { width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid var(--gray-border); background: var(--white); display: flex; align-items: center; justify-content: center; font-size: 14px; z-index: 1; transition: all 0.3s; }
+  .hub-status-step.done .hub-step-dot { background: var(--green-mid); border-color: var(--green-mid); color: white; }
+  .hub-status-step.active .hub-step-dot { border-color: var(--green-mid); background: var(--white); animation: pulse-hub 1.8s infinite; }
+  .hub-step-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-align: center; line-height: 1.2; margin-top: 2px; }
+  .hub-status-step.done .hub-step-label { color: var(--green); }
+  .hub-status-step.active .hub-step-label { color: var(--text); }
+  .hub-status-caption { font-size: 13px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+  .hub-status-caption.good { color: var(--green); font-weight: 500; }
+  @keyframes pulse-hub { 0%,100% { box-shadow: 0 0 0 0 rgba(74,163,85,0.35); } 50% { box-shadow: 0 0 0 6px rgba(74,163,85,0); } }
+
+  /* TABS in admin */
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--gray-border); margin-bottom: 20px; }
+  .tab { padding: 10px 18px; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab.active { color: var(--amber-on-white); border-bottom-color: var(--brand); }
+
+  /* Icon arrows */
+  .arrow { color: var(--text-muted); font-size: 13px; }
+
+  @media (max-width: 500px) {
+    .top-bar h1 { font-size: 15px; padding: 12px 14px; }
+    .role-btn { font-size: 12px; padding: 0 10px; }
+    .view { padding: 14px; }
+    .item-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .item-row > .item-qty { display: inline; }
+    .item-row .item-actions { width: 100%; justify-content: flex-end; padding-top: 4px; border-top: 1px solid var(--gray-light); margin-top: 4px; }
+    .item-name { font-size: 15px; }
+    .item-route { font-size: 13px; }
+  }
+  .issue-reason-btn { padding: 12px 8px; border: 2px solid var(--gray-border); border-radius: var(--radius); background: var(--white); font-size: 13px; font-weight: 800; cursor: pointer; transition: all 0.15s; text-align:center; }
+  .issue-reason-btn:hover { border-color: var(--brand); background: var(--amber-light); }
+  .issue-reason-btn.selected { border-color: var(--brand); background: var(--brand); color: var(--amber-on-white); }
+  .issue-resolved-btn { border-color: var(--green); color: var(--green); }
+  .issue-resolved-btn:hover { background: var(--green); color: var(--white); border-color: var(--green); }
+  .issue-resolved-btn.selected { border-color: var(--green); background: var(--green); color: var(--white); }
+  .flag-badge { display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;background:var(--red-light);color:var(--red); }
+  .pin-dot { width:14px;height:14px;border-radius:50%;border:2px solid var(--gray-border);background:var(--white);transition:all 0.15s; }
+  .pin-dot.filled { background:var(--amber-on-white);border-color:var(--amber-on-white); }
+  .pin-btn { padding:14px;border:2px solid var(--gray-border);border-radius:var(--radius);background:var(--white);font-size:18px;font-weight:800;font-family:'Poppins',sans-serif;cursor:pointer;transition:all 0.15s;color:var(--text); }
+  .pin-btn:hover { background:var(--amber-light);border-color:var(--brand); }
+  .pin-btn:empty { visibility:hidden; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1 id="top-bar-title">🌿 NE Vic Run Sheet</h1>
+  <div class="role-switcher">
+    <button class="role-btn" id="home-btn" onclick="showHome()" style="display:none">← Home</button>
+  </div>
+</div>
+
+<!-- ===== HOME VIEW ===== -->
+<div class="view active" id="view-home">
+  <div id="home-screen">
+    <div style="text-align:center;padding:32px 20px 24px">
+      <!-- Produce SVG illustration -->
+      <svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:340px;margin:0 auto 8px;display:block">
+        <!-- Background circle -->
+        <circle cx="160" cy="80" r="75" fill="#fef6d8" opacity="0.8"/>
+
+        <!-- Mushrooms (left) -->
+        <ellipse cx="72" cy="105" rx="18" ry="6" fill="#c97a2a" opacity="0.4"/>
+        <path d="M60 105 Q60 78 72 75 Q84 78 84 105Z" fill="#e8943a"/>
+        <path d="M56 90 Q56 68 72 65 Q88 68 88 90" fill="#b8602a"/>
+        <circle cx="68" cy="78" r="3" fill="#fef6d8" opacity="0.5"/>
+        <circle cx="76" cy="72" r="2" fill="#fef6d8" opacity="0.5"/>
+        <!-- Second mushroom -->
+        <ellipse cx="95" cy="108" rx="12" ry="4" fill="#c97a2a" opacity="0.4"/>
+        <path d="M86 108 Q86 90 95 88 Q104 90 104 108Z" fill="#e8943a"/>
+        <path d="M83 96 Q83 80 95 78 Q107 80 107 96" fill="#b8602a"/>
+
+        <!-- Bread loaf (centre) -->
+        <ellipse cx="160" cy="112" rx="30" ry="8" fill="#c97a2a" opacity="0.3"/>
+        <path d="M132 112 Q132 85 160 82 Q188 85 188 112Z" fill="#e8b86d"/>
+        <path d="M135 100 Q140 88 160 85 Q180 88 185 100" fill="#d4954a" stroke="none"/>
+        <line x1="148" y1="95" x2="172" y2="95" stroke="#c97a2a" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+        <line x1="145" y1="102" x2="175" y2="102" stroke="#c97a2a" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+        <!-- Cheese wedge (right) -->
+        <polygon points="230,115 260,115 255,85" fill="#f5c842"/>
+        <polygon points="230,115 260,115 255,85" fill="#f5c842"/>
+        <polygon points="228,113 258,113 253,83" fill="#f7d060" opacity="0.7"/>
+        <circle cx="248" cy="102" r="3" fill="#e8a820" opacity="0.7"/>
+        <circle cx="240" cy="108" r="2" fill="#e8a820" opacity="0.7"/>
+        <circle cx="252" cy="108" r="2" fill="#e8a820" opacity="0.5"/>
+
+        <!-- Leafy greens (far right) -->
+        <ellipse cx="285" cy="108" rx="10" ry="4" fill="#3B6D11" opacity="0.3"/>
+        <path d="M278 108 Q274 92 285 88 Q290 94 288 108Z" fill="#5a9e1a"/>
+        <path d="M285 108 Q282 90 292 86 Q296 93 293 108Z" fill="#3B6D11"/>
+        <path d="M290 108 Q292 94 298 92 Q299 98 295 108Z" fill="#5a9e1a"/>
+
+        <!-- Milk bottle (far left) -->
+        <rect x="32" y="82" width="16" height="28" rx="3" fill="white" stroke="#d3d1c7" stroke-width="1.5"/>
+        <rect x="34" y="76" width="12" height="10" rx="2" fill="white" stroke="#d3d1c7" stroke-width="1.5"/>
+        <rect x="36" y="74" width="8" height="5" rx="1" fill="#d3d1c7"/>
+        <path d="M34 95 Q40 92 46 95" stroke="#5a9e1a" stroke-width="1.5" fill="none"/>
+
+        <!-- Little stars/sparkles -->
+        <text x="118" y="58" font-size="14" text-anchor="middle" opacity="0.6">✦</text>
+        <text x="200" y="52" font-size="10" text-anchor="middle" opacity="0.4">✦</text>
+        <text x="145" y="48" font-size="8" text-anchor="middle" opacity="0.3">✦</text>
+      </svg>
+
+      <h1 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:28px;color:var(--amber-on-white);margin-bottom:6px;line-height:1.2">NE Vic<br>Run Sheet</h1>
+      <p style="font-size:14px;color:var(--text-muted);margin-bottom:32px">Run sheet &amp; logistics</p>
+      <p style="font-size:10px;color:var(--text-muted);opacity:0.6;margin-top:-24px;margin-bottom:32px;letter-spacing:0.3px">Built by Adam &amp; Claude to tackle rural logistics 🌾</p>
+
+      <!-- Role cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;margin:0 auto 12px">
+        <button onclick="goDriver()" style="background:var(--white);border:2px solid var(--gray-border);border-radius:var(--radius-lg);padding:24px 16px;cursor:pointer;transition:all 0.15s;text-align:center" onmouseover="this.style.borderColor='var(--brand)';this.style.background='var(--amber-light)'" onmouseout="this.style.borderColor='var(--gray-border)';this.style.background='var(--white)'">
+          <div style="font-size:36px;margin-bottom:8px">🚚</div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:900;font-size:16px;color:var(--amber-on-white)">Driver</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">View your run</div>
+        </button>
+        <button onclick="goHub()" style="background:var(--white);border:2px solid var(--gray-border);border-radius:var(--radius-lg);padding:24px 16px;cursor:pointer;transition:all 0.15s;text-align:center" onmouseover="this.style.borderColor='var(--brand)';this.style.background='var(--amber-light)'" onmouseout="this.style.borderColor='var(--gray-border)';this.style.background='var(--white)'">
+          <div style="font-size:36px;margin-bottom:8px">🏪</div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:900;font-size:16px;color:var(--amber-on-white)">Hub</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">Your inbound &amp; outbound</div>
+        </button>
+      </div>
+      <div style="max-width:400px;margin:0 auto">
+        <button onclick="goAdmin()" style="background:var(--white);border:2px solid var(--gray-border);border-radius:var(--radius-lg);padding:16px;cursor:pointer;transition:all 0.15s;text-align:center;width:100%" onmouseover="this.style.borderColor='var(--brand)';this.style.background='var(--amber-light)'" onmouseout="this.style.borderColor='var(--gray-border)';this.style.background='var(--white)'">
+          <div style="font-size:28px;margin-bottom:4px">⚙️</div>
+          <div style="font-family:'Poppins',sans-serif;font-weight:900;font-size:15px;color:var(--amber-on-white)">Admin</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Manage runs &amp; manifest</div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIN MODAL -->
+<div id="pin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:400;display:none;align-items:center;justify-content:center;padding:24px">
+  <div style="background:var(--white);border-radius:var(--radius-lg);max-width:320px;width:100%;padding:28px;text-align:center">
+    <div style="font-size:32px;margin-bottom:8px">🔒</div>
+    <h2 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:18px;color:var(--amber-on-white);margin-bottom:6px">Admin access</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Enter your PIN to continue</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:20px" id="pin-dots">
+      <div class="pin-dot" id="dot-0"></div>
+      <div class="pin-dot" id="dot-1"></div>
+      <div class="pin-dot" id="dot-2"></div>
+      <div class="pin-dot" id="dot-3"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:220px;margin:0 auto 16px">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn" style="visibility:hidden"></button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn" onclick="pinPress('del')">⌫</button>
+    </div>
+    <button onclick="hidePinModal()" style="background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer">Cancel</button>
+  </div>
+</div>
+
+<!-- ===== ADMIN VIEW ===== -->
+<div class="view active" id="view-admin">
+  <div class="run-header">
+    <div>
+      <div class="run-date" id="admin-run-date">Loading runs...</div>
+      <div class="run-meta" id="admin-run-meta"></div>
+    </div>
+    <button class="btn btn-primary" onclick="showNewRunModal()">+ New run</button>
+  </div>
+
+  <div class="run-selector" id="admin-run-selector"></div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="adminTab('manifest')">Manifest</div>
+    <div class="tab" onclick="adminTab('add-item')">Add item</div>
+    <div class="tab" onclick="adminTab('import')">📋 Import WhatsApp</div>
+    <div class="tab" onclick="adminTab('status')">Live status</div>
+  </div>
+
+  <!-- MANIFEST TAB -->
+  <div id="tab-manifest">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:12px" id="manifest-actions" style="display:none">
+      <button class="btn btn-sm" onclick="clearByRoute('Bright Loop')">Clear Bright Loop</button>
+      <button class="btn btn-sm" onclick="clearByRoute('SKVFH & A&A Loop')">Clear SKVFH Loop</button>
+      <button class="btn btn-danger btn-sm" onclick="clearAllItems()">Clear all items</button>
+    </div>
+    <div id="admin-manifest-list"><div class="loading">Select a run above</div></div>
+  </div>
+
+  <!-- ADD ITEM TAB -->
+  <div id="tab-add-item" style="display:none">
+    <div class="card">
+      <div class="card-title">Add item to run</div>
+      <label>Item description</label>
+      <input type="text" id="item-desc" placeholder="e.g. 1 box mixed mushrooms" />
+      <label>Quantity</label>
+      <input type="number" id="item-qty" value="1" min="1" style="width:100px" />
+      <div class="form-row" style="margin-top:4px">
+        <div>
+          <label>Pickup from</label>
+          <select id="item-from">
+            <option value="">— select —</option>
+          </select>
+        </div>
+        <div>
+          <label>Drop to</label>
+          <select id="item-to">
+            <option value="">— select —</option>
+          </select>
+        </div>
+      </div>
+      <label>Assign to driver</label>
+      <select id="item-driver">
+        <option value="">— select —</option>
+      </select>
+      <label>Notes (optional)</label>
+      <input type="text" id="item-notes" placeholder="e.g. Keep refrigerated" />
+      <button class="btn btn-primary" style="margin-top:6px" onclick="addItem()">Add to manifest</button>
+    </div>
+  </div>
+
+  <!-- IMPORT TAB -->
+  <div id="tab-import" style="display:none">
+    <div class="card">
+      <div class="card-title">Paste your WhatsApp run message</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Copy the Wednesday WhatsApp message and paste it below. Claude will read it and pull out the items, assign drivers and destinations where it can tell, and let you review before adding to the run.</p>
+      <textarea id="whatsapp-paste" rows="12" placeholder="Paste WhatsApp message here..." style="font-size:13px;line-height:1.5;font-family:monospace"></textarea>
+      <div style="display:flex;gap:10px;margin-top:4px;align-items:center">
+        <button class="btn btn-primary" onclick="parseWhatsApp()" id="parse-btn">Parse message</button>
+        <span id="parse-status" style="font-size:13px;color:var(--text-muted)"></span>
+      </div>
+    </div>
+    <div id="parsed-results" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-weight:600;font-size:15px">Review parsed items</div>
+        <button class="btn btn-primary" onclick="confirmImport()">Add all to run ✓</button>
+      </div>
+      <div id="parsed-items-list"></div>
+    </div>
+  </div>
+
+  <!-- LIVE STATUS TAB -->
+  <div id="tab-status" style="display:none">
+    <div id="status-overview"></div>
+  </div>
+</div>
+
+<!-- ===== DRIVER VIEW ===== -->
+<div class="view" id="view-driver">
+  <div class="section-label">Select driver</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px" id="driver-selector">
+    <button class="run-pill" onclick="loadDriverRun('Bright Loop')">Bright Loop</button>
+    <button class="run-pill" onclick="loadDriverRun('SKVFH & A&A Loop')">SKVFH & A&A Loop</button>
+  </div>
+
+  <div id="driver-run-info" style="display:none">
+    <div class="run-header">
+      <div>
+        <div class="run-date" id="driver-name-display"></div>
+        <div class="run-meta" id="driver-run-meta"></div>
+      </div>
+    </div>
+    <div id="driver-complete-banner"></div>
+    <div class="progress-bar"><div class="progress-fill" id="driver-progress" style="width:0%"></div></div>
+    <div id="driver-progress-text" style="font-size:13px;color:var(--text-muted);margin-bottom:16px"></div>
+    <div id="driver-stops"></div>
+    <div class="complete-run-btn-wrap" id="driver-complete-btn-wrap"></div>
+  </div>
+  <div id="driver-empty" class="empty">
+    <div style="font-size:40px;margin-bottom:8px">🚚</div>
+    <div>Select a driver to see their run</div>
+  </div>
+</div>
+
+<!-- ===== HUB VIEW ===== -->
+<div class="view" id="view-hub">
+  <div class="section-label">Select your hub</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px" id="hub-selector"></div>
+
+  <div id="hub-detail" style="display:none">
+    <div class="run-date" id="hub-name-display" style="margin-bottom:4px"></div>
+    <div class="run-meta" style="margin-bottom:16px" id="hub-run-meta"></div>
+
+    <!-- HUB STATUS BAR -->
+    <div class="hub-status-bar" id="hub-status-bar" style="display:none">
+      <div class="hub-status-steps">
+        <div class="hub-status-step" id="hstep-0">
+          <div class="hub-step-dot">📦</div>
+          <div class="hub-step-label">Items<br>collected</div>
+        </div>
+        <div class="hub-status-step" id="hstep-1">
+          <div class="hub-step-dot">🚚</div>
+          <div class="hub-step-label">Driver<br>en route</div>
+        </div>
+        <div class="hub-status-step" id="hstep-2">
+          <div class="hub-step-dot">✓</div>
+          <div class="hub-step-label">Drop<br>complete</div>
+        </div>
+      </div>
+      <div class="hub-status-caption" id="hub-status-caption">Loading run status…</div>
+    </div>
+
+    <div class="ready-toggle" id="hub-ready-row">
+      <span id="hub-ready-label">Mark your drop as ready for pickup</span>
+      <button class="btn btn-success btn-sm" id="hub-ready-btn" onclick="toggleHubReady()">Mark ready ✓</button>
+    </div>
+
+    <div class="section-label">Inbound — arriving today</div>
+    <div id="hub-inbound"></div>
+
+    <div class="section-label">Outbound — leaving today</div>
+    <div id="hub-outbound"></div>
+  </div>
+
+  <div id="hub-empty" class="empty">
+    <div style="font-size:40px;margin-bottom:8px">🏪</div>
+    <div>Select your hub to see today's run</div>
+  </div>
+</div>
+
+<!-- NEW RUN MODAL (inline) -->
+<div id="new-run-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:100;overflow-y:auto;padding:24px">
+  <div style="background:var(--white);border-radius:var(--radius-lg);max-width:520px;margin:0 auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:18px;font-weight:700">Create new run</h2>
+      <button onclick="hideNewRunModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <label>Run date</label>
+    <input type="date" id="new-run-date" />
+    <label>Run name / label</label>
+    <input type="text" id="new-run-name" placeholder="e.g. Thursday NE Loop" />
+    <div style="display:flex;gap:10px;margin-top:6px">
+      <button class="btn btn-primary" style="flex:1" onclick="createRun()">Create run</button>
+      <button class="btn" onclick="hideNewRunModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- NEW ITEM BANNER -->
+<div id="new-items-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:200;background:var(--brand);color:var(--amber-on-white);padding:12px 20px;text-align:center;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer" onclick="dismissBanner()">
+  ⚡ New items added to your run — <u>tap to refresh</u>
+</div>
+
+<!-- FLAG ISSUE MODAL (driver: create or edit own flag) -->
+<div id="issue-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;padding:24px;overflow-y:auto">
+  <div style="background:var(--white);border-radius:var(--radius-lg);max-width:420px;margin:0 auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 id="issue-modal-title" style="font-size:17px;font-weight:900;font-family:'Poppins',sans-serif;color:var(--amber-on-white)">Flag an issue</h2>
+      <button onclick="hideIssueModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="issue-item-name" style="font-size:14px;color:var(--text-muted);margin-bottom:16px;padding:10px 12px;background:var(--gray-light);border-radius:var(--radius)"></div>
+    <label>What is the issue?</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px" id="issue-reason-btns">
+      <button class="issue-reason-btn" onclick="selectReason('Not found')">🔍 Not found</button>
+      <button class="issue-reason-btn" onclick="selectReason('Not ready')">⏳ Not ready</button>
+      <button class="issue-reason-btn" onclick="selectReason('Damaged')">⚠️ Damaged</button>
+      <button class="issue-reason-btn" onclick="selectReason('Wrong item')">❌ Wrong item</button>
+    </div>
+    <div id="issue-resolved-row" style="display:none;margin-bottom:14px">
+      <button class="issue-reason-btn issue-resolved-btn" style="width:100%" onclick="selectReason('Found / Resolved')">✅ Found / Resolved</button>
+    </div>
+    <label>Extra notes (optional)</label>
+    <input type="text" id="issue-notes" placeholder="e.g. box was left outside, no one home..." />
+    <div id="issue-hub-reply-box" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--gray-light);border-radius:var(--radius)">
+      <label style="margin-bottom:2px">Hub's reply</label>
+      <div id="issue-hub-reply-text" style="font-size:14px"></div>
+    </div>
+    <button class="btn btn-primary" id="issue-submit-btn" style="width:100%;justify-content:center;margin-top:6px" onclick="submitIssue()">Submit flag</button>
+  </div>
+</div>
+
+<!-- FLAG DETAIL MODAL (hub: view + reply) -->
+<div id="flag-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;padding:24px;overflow-y:auto">
+  <div style="background:var(--white);border-radius:var(--radius-lg);max-width:420px;margin:0 auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:17px;font-weight:900;font-family:'Poppins',sans-serif;color:var(--red)">🚩 Flagged item</h2>
+      <button onclick="hideFlagDetailModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="flag-detail-item-name" style="font-size:14px;color:var(--text-muted);margin-bottom:12px;padding:10px 12px;background:var(--gray-light);border-radius:var(--radius)"></div>
+    <div style="margin-bottom:14px">
+      <label>Reason</label>
+      <div id="flag-detail-reason" style="font-size:15px;font-weight:600;margin-bottom:10px"></div>
+      <label>Driver's notes</label>
+      <div id="flag-detail-notes" style="font-size:14px;color:var(--text)"></div>
+      <div id="flag-detail-meta" style="font-size:12px;color:var(--text-muted);margin-top:8px"></div>
+    </div>
+    <label>Your reply</label>
+    <input type="text" id="flag-reply-input" placeholder="e.g. found the milk kegs out back, will hold for next run..." />
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px" onclick="submitHubReply()">Save reply</button>
+  </div>
+</div>
+
+<!-- COMPLETE RUN CONFIRMATION MODAL -->
+<div id="complete-run-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;padding:24px;overflow-y:auto">
+  <div style="background:var(--white);border-radius:var(--radius-lg);max-width:420px;margin:0 auto;padding:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h2 style="font-size:17px;font-weight:900;font-family:'Poppins',sans-serif;color:var(--amber-on-white)">Complete run?</h2>
+      <button onclick="hideCompleteRunModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">✕</button>
+    </div>
+    <div id="complete-run-summary" style="font-size:14px;color:var(--text);margin-bottom:16px;padding:12px 14px;background:var(--gray-light);border-radius:var(--radius)"></div>
+    <div class="alert alert-warning">This locks further status changes. Any flagged or pending items will be carried over to next week's run automatically.</div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px" onclick="confirmCompleteRun()">Yes, complete run</button>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://lyruvvsrkbcezkwuofgp.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5cnV2dnNya2JjZXprd3VvZmdwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzA3OTIsImV4cCI6MjA5Njc0Njc5Mn0.ywZslto7bbqnDFbElbs4au8lvRw-KNjRuBNZYaQQZjQ';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---- TIMEZONE-SAFE DATE HELPERS ----
+// .toISOString() converts to UTC, which shifts the calendar date backward
+// during Melbourne mornings (UTC+10/+11). These helpers stay in local time.
+
+// "Today" as a YYYY-MM-DD string, using local (not UTC) date parts.
+function localToday() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Formats a Date object as YYYY-MM-DD using its UTC fields. Pair this with
+// dates built via Date.UTC(...) so the arithmetic and the formatting agree —
+// never mix a UTC-constructed date with local formatting or vice versa.
+function fmtUTCDateStr(d) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const HUBS = [
+  'Bright Food Co-op',
+  'Sustainable King Valley Food Hub',
+  'Acres & Acres'
+];
+
+const PRODUCERS = [
+  'Markwood Mushrooms',
+  'Murmungee Basin Produce',
+  'Little Cedar Cheese',
+  'Silver Creek Sourdough',
+  'Pepo Farms',
+  'Lomandra Farms',
+  'Gamila of Beechworth',
+  'HowNow Dairy Numurkah',
+  'NE Foods',
+  'Farm to Fork Butchery',
+  'Bright Organics',
+  'Honeybird'
+];
+
+const DROP_POINTS = [
+  'Bright Brewery',
+  'BotanicAlps',
+  "Basil's",
+  'Elm Dining',
+  'Other'
+];
+
+const ALL_KNOWN_LOCATIONS = [...HUBS, ...PRODUCERS, ...DROP_POINTS];
+
+const LOCATIONS = [...HUBS, ...PRODUCERS, ...DROP_POINTS];
+
+const DRIVERS = ['Bright Loop', 'SKVFH & A&A Loop'];
+
+let currentRunId = null;
+let allRuns = [];
+let currentDriverName = null;
+let currentHubName = null;
+
+// ---- DB SETUP ----
+async function ensureTables() {
+  // We use Supabase REST — tables must exist. Check by trying a select.
+  // Tables: runs, items
+  try {
+    await db.from('runs').select('id').limit(1);
+  } catch(e) {}
+  try {
+    await db.from('items').select('id').limit(1);
+  } catch(e) {}
+}
+
+// ---- RUNS ----
+async function loadRuns() {
+  const { data, error } = await db.from('runs').select('*').order('run_date', { ascending: false });
+  if (error) {
+    document.getElementById('admin-run-date').textContent = 'Could not load runs. Check Supabase setup.';
+    console.error(error);
+    return;
+  }
+  allRuns = data || [];
+  renderRunSelector();
+  if (allRuns.length > 0) {
+    selectRun(allRuns[0].id);
+  } else {
+    document.getElementById('admin-run-date').textContent = 'No runs yet';
+    document.getElementById('admin-manifest-list').innerHTML = '<div class="empty"><div style="font-size:36px;margin-bottom:8px">📋</div><div>Create your first run above</div></div>';
+  }
+}
+
+function renderRunSelector() {
+  const sel = document.getElementById('admin-run-selector');
+  sel.innerHTML = allRuns.slice(0, 6).map(r =>
+    `<div class="run-pill ${r.id === currentRunId ? 'active' : ''}" onclick="selectRun('${r.id}')">${fmtDate(r.run_date)}</div>`
+  ).join('');
+}
+
+function selectRun(id) {
+  currentRunId = id;
+  const run = allRuns.find(r => r.id === id);
+  if (!run) return;
+  document.getElementById('admin-run-date').textContent = fmtDate(run.run_date);
+  document.getElementById('admin-run-meta').textContent = run.name || '';
+  renderRunSelector();
+  loadManifest();
+  loadStatusOverview();
+  // Pre-set add-item driver selects
+  populateSelects();
+}
+
+function populateSelects() {
+  ['item-from', 'item-to'].forEach(function(id) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    const grouped = [
+      ['Hubs', HUBS],
+      ['Producers', PRODUCERS],
+      ['Drop points', DROP_POINTS]
+    ];
+    sel.innerHTML = '<option value="">— select —</option>' +
+      grouped.map(function(g) {
+        return '<optgroup label="' + g[0] + '">' +
+          g[1].map(function(l) {
+            return '<option value="' + l + '"' + (l === cur ? ' selected' : '') + '>' + l + '</option>';
+          }).join('') +
+          '</optgroup>';
+      }).join('');
+  });
+  const ds = document.getElementById('item-driver');
+  if (!ds) return;
+  const dcur = ds.value;
+  ds.innerHTML = '<option value="">— select —</option>' +
+    DRIVERS.map(function(d) {
+      return '<option value="' + d + '"' + (d === dcur ? ' selected' : '') + '>' + d + '</option>';
+    }).join('');
+}
+
+// ---- MANIFEST ----
+async function loadManifest() {
+  if (!currentRunId) return;
+  const list = document.getElementById('admin-manifest-list');
+  list.innerHTML = '<div class="loading">Loading...</div>';
+  const { data, error } = await db.from('items').select('*').eq('run_id', currentRunId).order('created_at');
+  if (error) { list.innerHTML = '<div class="alert alert-warning">Error loading items</div>'; return; }
+  if (!data || data.length === 0) {
+    list.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div><div>No items yet — use the Add item tab</div></div>';
+    return;
+  }
+  // Group by driver
+  const byDriver = {};
+  data.forEach(item => {
+    const d = item.driver || 'Unassigned';
+    if (!byDriver[d]) byDriver[d] = [];
+    byDriver[d].push(item);
+  });
+  list.innerHTML = Object.entries(byDriver).map(([driver, items]) => `
+    <div class="card">
+      <div class="card-title">🚚 ${driver} <span class="sub">${items.length} item${items.length !== 1 ? 's' : ''}</span></div>
+      ${items.map(item => itemRowAdmin(item)).join('')}
+    </div>
+  `).join('');
+}
+
+function itemRowAdmin(item) {
+  const id = item.id;
+  const div = document.createElement('div');
+  div.className = 'item-row';
+  div.id = 'item-' + id;
+  div.innerHTML = '<div class="item-qty">' + item.qty + '</div>' +
+    '<div class="item-info">' +
+      '<div class="item-name">' + esc(item.description) + '</div>' +
+      '<div class="item-route">' + esc(item.pickup_from) + ' <span class="arrow">→</span> <strong style="color:var(--text)">' + esc(item.drop_to) + '</strong>' +
+        (item.notes ? ' <span style="margin-left:6px;color:var(--text-muted)">· ' + esc(item.notes) + '</span>' : '') +
+      '</div>' +
+      '<div id="notes-edit-' + id + '" style="display:none;margin-top:6px">' +
+        '<input type="text" id="notes-input-' + id + '" value="' + esc(item.notes || '') + '" placeholder="Add a note for the driver..." style="margin-bottom:4px;font-size:13px" />' +
+        '<div style="display:flex;gap:6px" id="notes-btns-' + id + '"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="item-actions">' +
+      '<span class="badge badge-' + (item.status || 'pending') + '">' + (item.status || 'pending') + '</span>' +
+      '<button class="btn btn-sm" id="edit-btn-' + id + '" title="Edit notes">✏️</button>' +
+      '<button class="btn btn-danger btn-sm" id="del-btn-' + id + '">✕</button>' +
+    '</div>';
+
+  // Attach events after creating element (avoids all quote issues)
+  setTimeout(function() {
+    const editBtn = document.getElementById('edit-btn-' + id);
+    const delBtn = document.getElementById('del-btn-' + id);
+    const noteBtnsDiv = document.getElementById('notes-btns-' + id);
+    if (editBtn) editBtn.onclick = function() { editNotes(id); };
+    if (delBtn) delBtn.onclick = function() { deleteItem(id); };
+    if (noteBtnsDiv) {
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'btn btn-primary btn-sm';
+      saveBtn.textContent = 'Save';
+      saveBtn.onclick = function() { saveNotes(id); };
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn btn-sm';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.onclick = function() { cancelNotes(id); };
+      noteBtnsDiv.appendChild(saveBtn);
+      noteBtnsDiv.appendChild(cancelBtn);
+    }
+  }, 0);
+
+  return div.outerHTML;
+}
+
+
+function editNotes(itemId) {
+  document.getElementById('notes-edit-' + itemId).style.display = 'block';
+  document.getElementById('notes-input-' + itemId).focus();
+}
+
+function cancelNotes(itemId) {
+  document.getElementById('notes-edit-' + itemId).style.display = 'none';
+}
+
+async function saveNotes(itemId) {
+  const val = document.getElementById('notes-input-' + itemId).value.trim();
+  const { error } = await db.from('items').update({ notes: val }).eq('id', itemId);
+  if (error) { toast('Could not save note'); return; }
+  toast('Note saved ✓');
+  loadManifest();
+}
+
+async function addItem() {
+  if (!currentRunId) { toast('Select a run first'); return; }
+  const desc = document.getElementById('item-desc').value.trim();
+  const qty = parseInt(document.getElementById('item-qty').value) || 1;
+  const from = document.getElementById('item-from').value;
+  const to = document.getElementById('item-to').value;
+  const driver = document.getElementById('item-driver').value;
+  const notes = document.getElementById('item-notes').value.trim();
+  if (!desc) { toast('Add an item description'); return; }
+  if (!from) { toast('Select pickup location'); return; }
+  if (!to) { toast('Select drop location'); return; }
+  if (!driver) { toast('Assign a driver'); return; }
+
+  // Duplicate check
+  const { data: existing } = await db.from('items').select('*').eq('run_id', currentRunId).eq('pickup_from', from);
+  if (existing && existing.length > 0) {
+    const descWords = desc.toLowerCase().split(' ').filter(function(w) { return w.length > 3; });
+    const duplicate = existing.find(function(item) {
+      const existingWords = item.description.toLowerCase();
+      return descWords.some(function(word) { return existingWords.includes(word); });
+    });
+    if (duplicate) {
+      const proceed = confirm('Possible duplicate!\n\n"' + duplicate.description + '" is already on this run from ' + from + '.\n\nAdd it anyway?');
+      if (!proceed) return;
+    }
+  }
+
+  const { error } = await db.from('items').insert({
+    run_id: currentRunId,
+    description: desc,
+    qty: qty,
+    pickup_from: from,
+    drop_to: to,
+    driver: driver,
+    notes: notes,
+    status: 'pending'
+  });
+  if (error) { toast('Error saving item'); console.error(error); return; }
+  toast('Added: ' + qty + 'x ' + desc + ' → ' + to);
+  document.getElementById('item-desc').value = '';
+  document.getElementById('item-qty').value = '1';
+  document.getElementById('item-notes').value = '';
+  loadManifest();
+  loadStatusOverview();
+}
+
+async function clearByRoute(route) {
+  if (!currentRunId) return;
+  if (!confirm('Remove all ' + route + ' items from this run?')) return;
+  await db.from('items').delete().eq('run_id', currentRunId).eq('driver', route);
+  toast(route + ' items cleared');
+  loadManifest();
+  loadStatusOverview();
+}
+
+async function clearAllItems() {
+  if (!currentRunId) return;
+  if (!confirm('Remove ALL items from this run? This cannot be undone.')) return;
+  await db.from('items').delete().eq('run_id', currentRunId);
+  toast('All items cleared');
+  loadManifest();
+  loadStatusOverview();
+}
+
+async function deleteItem(id) {
+  if (!confirm('Remove this item from the run?')) return;
+  await db.from('items').delete().eq('id', id);
+  loadManifest();
+  loadStatusOverview();
+  toast('Item removed');
+}
+
+// ---- STATUS OVERVIEW ----
+async function loadIssues() {
+  if (!currentRunId) return;
+  const { data } = await db.from('issues').select('*, items(description, pickup_from, drop_to, status)').eq('run_id', currentRunId).order('created_at', { ascending: false });
+  // Only surface issues whose item is still actually flagged — once a driver
+  // marks one "Found / Resolved" the item reverts to pending and should drop off this list.
+  return (data || []).filter(issue => issue.items && issue.items.status === 'flagged');
+}
+
+async function loadStatusOverview() {
+  if (!currentRunId) return;
+  const { data } = await db.from('items').select('*').eq('run_id', currentRunId);
+  const el = document.getElementById('status-overview');
+  if (!data || data.length === 0) { el.innerHTML = '<div class="empty">No items in this run yet</div>'; return; }
+
+  const issues = await loadIssues();
+  const { data: completions } = await db.from('driver_completions').select('*').eq('run_id', currentRunId);
+  const completedDrivers = new Set((completions || []).map(c => c.driver));
+
+  // ── Totals bar ──
+  const total = data.length;
+  const nCollected = data.filter(i => i.status === 'collected').length;
+  const nDelivered = data.filter(i => i.status === 'delivered').length;
+  const nFlagged  = data.filter(i => i.status === 'flagged').length;
+  const nPending  = total - nCollected - nDelivered - nFlagged;
+  const pctDone   = Math.round(((nCollected + nDelivered) / total) * 100);
+
+  const totalsHtml =
+    '<div class="card" style="margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<div style="font-size:15px;font-weight:600">Run progress</div>' +
+        '<div style="font-size:13px;color:var(--text-muted)">' + (nCollected + nDelivered) + ' of ' + total + ' items actioned</div>' +
+      '</div>' +
+      '<div class="progress-bar" style="margin:0 0 12px"><div class="progress-fill" style="width:' + pctDone + '%"></div></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        (nPending  ? '<span class="badge badge-pending">'   + nPending   + ' pending</span>'   : '') +
+        (nCollected? '<span class="badge badge-collected">' + nCollected + ' collected</span>' : '') +
+        (nDelivered? '<span class="badge badge-delivered">' + nDelivered + ' delivered</span>' : '') +
+        (nFlagged  ? '<span class="badge badge-flagged">'   + nFlagged   + ' flagged</span>'   : '') +
+      '</div>' +
+    '</div>';
+
+  // ── Flagged issues ──
+  let issuesHtml = '';
+  if (issues.length > 0) {
+    const rows = issues.map(issue => {
+      const desc   = esc(issue.items ? issue.items.description : 'Unknown item');
+      const driver = esc(issue.driver || '—');
+      const reason = esc(issue.reason || '');
+      const notes  = issue.notes ? ' · ' + esc(issue.notes) : '';
+      const replyTag = issue.hub_reply ? ' · <span style="color:var(--green)">💬 replied</span>' : '';
+      return '<div class="item-row hub-flag-tile" data-id="' + issue.item_id + '" style="cursor:pointer">' +
+        '<div class="item-info">' +
+          '<div class="item-name">' + desc + '</div>' +
+          '<div class="item-route">' + driver + ' · <strong style="color:var(--red)">' + reason + '</strong>' + notes + replyTag + '</div>' +
+        '</div>' +
+        '<span class="badge badge-flagged">flagged</span>' +
+      '</div>';
+    }).join('');
+    issuesHtml = '<div class="card" style="border-left:4px solid var(--red);margin-bottom:16px">' +
+      '<div class="card-title" style="color:var(--red)">🚩 Flagged issues (' + issues.length + ')</div>' +
+      rows + '</div>';
+  }
+
+  // ── Per-driver breakdown ──
+  const drivers = {};
+  data.forEach(item => {
+    const d = item.driver || 'Unassigned';
+    if (!drivers[d]) drivers[d] = [];
+    drivers[d].push(item);
+  });
+
+  const driverCards = Object.entries(drivers).map(([driverName, items]) => {
+    const dTotal     = items.length;
+    const dActioned  = items.filter(i => i.status === 'collected' || i.status === 'delivered').length;
+    const dDelivered = items.filter(i => i.status === 'delivered').length;
+    const dFlagged   = items.filter(i => i.status === 'flagged').length;
+    const dPct       = Math.round((dActioned / dTotal) * 100);
+    const isCompleted = completedDrivers.has(driverName);
+
+    const statusDot = dActioned === 0
+      ? '<span style="color:var(--text-muted)">⬤</span>'
+      : dDelivered === dTotal
+        ? '<span style="color:var(--green)">⬤</span>'
+        : '<span style="color:var(--amber)">⬤</span>';
+
+    const itemRows = items.map(item => {
+      const s = item.status || 'pending';
+      const icon = s === 'delivered' ? '✓' : s === 'collected' ? '↑' : s === 'flagged' ? '⚑' : '·';
+      const fade = (s === 'delivered') ? 'opacity:0.5;' : '';
+      return '<div class="item-row" style="' + fade + 'padding:8px 0">' +
+        '<div style="font-size:13px;font-weight:700;min-width:18px;color:' +
+          (s==='delivered'?'var(--green)':s==='collected'?'#185FA5':s==='flagged'?'var(--red)':'var(--text-muted)') +
+        '">' + icon + '</div>' +
+        '<div class="item-qty" style="font-size:14px">' + item.qty + '</div>' +
+        '<div class="item-info">' +
+          '<div class="item-name" style="font-size:14px">' + esc(item.description) + '</div>' +
+          '<div class="item-route">' + esc(item.pickup_from) + ' <span class="arrow">→</span> <strong>' + esc(item.drop_to) + '</strong></div>' +
+        '</div>' +
+        '<span class="badge badge-' + s + '">' + s + '</span>' +
+      '</div>';
+    }).join('');
+
+    const completionRow = isCompleted
+      ? '<div style="display:flex;align-items:center;justify-content:space-between;background:var(--green-light);border-radius:var(--radius);padding:8px 12px;margin-top:8px">' +
+          '<span style="font-size:13px;color:var(--green);font-weight:600">✓ Run completed</span>' +
+          '<button class="btn btn-sm reopen-driver-btn" data-driver="' + esc(driverName) + '" style="font-size:12px">Reopen</button>' +
+        '</div>'
+      : '';
+
+    return '<div class="card" style="margin-bottom:12px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+        '<div style="font-size:16px;font-weight:700">' + statusDot + ' 🚚 ' + esc(driverName) + '</div>' +
+        '<div style="font-size:13px;color:var(--text-muted)">' + dActioned + '/' + dTotal + ' · ' + dPct + '%' +
+          (dFlagged ? ' · <span style="color:var(--red)">🚩 ' + dFlagged + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="progress-bar" style="margin:0 0 10px"><div class="progress-fill" style="width:' + dPct + '%"></div></div>' +
+      itemRows +
+      completionRow +
+    '</div>';
+  }).join('');
+
+  // ── Hub readiness ──
+  const { data: hubReadyData } = await db.from('hub_ready').select('*').eq('run_id', currentRunId);
+  const readyHubs = hubReadyData ? hubReadyData.filter(h => h.is_ready).map(h => h.hub_name) : [];
+  const notReadyHubs = hubReadyData ? hubReadyData.filter(h => !h.is_ready).map(h => h.hub_name) : [];
+  const hubHtml = (readyHubs.length || notReadyHubs.length) ?
+    '<div class="card" style="margin-bottom:16px">' +
+      '<div class="card-title">🏪 Hub readiness</div>' +
+      readyHubs.map(h => '<div class="item-row" style="padding:6px 0"><div class="item-info"><div class="item-name">' + esc(h) + '</div></div><span class="badge badge-delivered">✓ Ready</span></div>').join('') +
+      notReadyHubs.map(h => '<div class="item-row" style="padding:6px 0"><div class="item-info"><div class="item-name">' + esc(h) + '</div></div><span class="badge badge-pending">Not yet</span></div>').join('') +
+    '</div>' : '';
+
+  // ── Admin complete-run control ──
+  const allDriversCompleted = DRIVERS.length > 0 && DRIVERS.every(d => completedDrivers.has(d));
+  const completeRunHtml = allDriversCompleted
+    ? '<div class="card" style="margin-bottom:16px;border-left:4px solid var(--green)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between">' +
+          '<span style="font-size:14px;color:var(--green);font-weight:600">✓ All drivers have completed this run</span>' +
+        '</div>' +
+      '</div>'
+    : '<div class="complete-run-btn-wrap"><button class="btn btn-primary btn-lg" onclick="openCompleteRunModal(\'admin\')">Complete run (all drivers)</button></div>';
+
+  // ── Last updated time ──
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+  const updatedHtml = '<div style="font-size:11px;color:var(--text-muted);text-align:right;margin-bottom:12px">Last updated ' + timeStr + ' · auto-refreshes every 30s</div>';
+
+  el.innerHTML = updatedHtml + totalsHtml + issuesHtml + hubHtml + driverCards + completeRunHtml;
+}
+
+// ---- CREATE RUN ----
+async function createRun() {
+  const date = document.getElementById('new-run-date').value;
+  const name = document.getElementById('new-run-name').value.trim();
+  if (!date) { toast('Pick a run date'); return; }
+  const { data, error } = await db.from('runs').insert({ run_date: date, name }).select().single();
+  if (error) { toast('Could not create run — check Supabase tables are set up'); console.error(error); return; }
+  hideNewRunModal();
+  toast('Run created!');
+  await loadRuns();
+  selectRun(data.id);
+}
+
+// ---- RUN COMPLETION & CARRY-OVER ----
+// Finds the Thursday following the given run_date (YYYY-MM-DD string), returns YYYY-MM-DD
+function nextThursdayAfter(runDateStr) {
+  const [y, m, day] = runDateStr.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1, day));
+  d.setUTCDate(d.getUTCDate() + 7); // weekly cadence: same weekday next week
+  return fmtUTCDateStr(d);
+}
+
+// Finds next week's run by date, creating it if it doesn't exist yet
+async function getOrCreateNextRun(currentRun) {
+  const nextDate = nextThursdayAfter(currentRun.run_date);
+  const { data: existing } = await db.from('runs').select('*').eq('run_date', nextDate).limit(1);
+  if (existing && existing[0]) return existing[0];
+  const { data: created, error } = await db.from('runs').insert({
+    run_date: nextDate,
+    name: currentRun.name || ''
+  }).select().single();
+  if (error) { console.error('Could not auto-create next run', error); return null; }
+  return created;
+}
+
+// Carries over flagged/pending items (optionally scoped to one driver) from `run` into next week's run.
+// Returns the count of items carried over.
+async function carryOverItems(run, driverFilter) {
+  const { data: allForRun } = await (driverFilter
+    ? db.from('items').select('*').eq('run_id', run.id).eq('driver', driverFilter)
+    : db.from('items').select('*').eq('run_id', run.id));
+  const eligible = (allForRun || []).filter(i => i.status === 'flagged' || i.status === 'pending' || !i.status);
+
+  if (eligible.length === 0) return 0;
+
+  const nextRun = await getOrCreateNextRun(run);
+  if (!nextRun) { toast('Could not create next week\'s run for carry-over'); return 0; }
+
+  const carryNote = '↻ Carried from ' + fmtDate(run.run_date);
+  const rows = eligible.map(item => ({
+    run_id: nextRun.id,
+    description: item.description,
+    qty: item.qty,
+    pickup_from: item.pickup_from,
+    drop_to: item.drop_to,
+    driver: item.driver,
+    notes: item.notes ? (item.notes + ' · ' + carryNote) : carryNote,
+    status: 'pending',
+    carried_from_item_id: item.id
+  }));
+
+  const { error } = await db.from('items').insert(rows);
+  if (error) { console.error('Carry-over insert failed', error); toast('Carry-over failed — check console'); return 0; }
+  return rows.length;
+}
+
+// Marks a driver's loop complete for a run: carries over their eligible items, then locks them via driver_completions
+async function completeDriverRun(run, driverName) {
+  const carried = await carryOverItems(run, driverName);
+  const { error } = await db.from('driver_completions').upsert({
+    run_id: run.id,
+    driver: driverName,
+    completed_at: new Date().toISOString()
+  }, { onConflict: 'run_id,driver' });
+  if (error) { console.error('Could not mark driver complete', error); toast('Could not complete run — check console'); return null; }
+  return carried;
+}
+
+// Marks the whole run complete: carries over all eligible items across all drivers, locks every driver
+async function completeWholeRun(run) {
+  const carried = await carryOverItems(run, null);
+  const drivers = DRIVERS;
+  for (const d of drivers) {
+    await db.from('driver_completions').upsert({
+      run_id: run.id,
+      driver: d,
+      completed_at: new Date().toISOString()
+    }, { onConflict: 'run_id,driver' });
+  }
+  return carried;
+}
+
+async function isDriverCompleted(runId, driverName) {
+  const { data } = await db.from('driver_completions').select('*').eq('run_id', runId).eq('driver', driverName).limit(1);
+  return !!(data && data[0]);
+}
+
+async function reopenDriver(runId, driverName) {
+  const { error } = await db.from('driver_completions').delete().eq('run_id', runId).eq('driver', driverName);
+  if (error) { toast('Could not reopen — check console'); console.error(error); return; }
+  toast(driverName + ' reopened ✓');
+}
+
+async function reopenDriverAndRefresh(driverName) {
+  if (!currentRunId) return;
+  if (!confirm('Reopen ' + driverName + '\'s run? They will be able to make status changes again. (Already carried-over items will not be undone.)')) return;
+  await reopenDriver(currentRunId, driverName);
+  loadStatusOverview();
+}
+
+// ---- DRIVER VIEW ----
+let currentDriverRunObj = null;
+let currentDriverIsLocked = false;
+
+async function loadDriverRun(driverName) {
+  currentDriverName = driverName;
+  document.querySelectorAll('#driver-selector .run-pill').forEach(b => b.classList.toggle('active', b.textContent === driverName));
+  document.getElementById('driver-empty').style.display = 'none';
+  document.getElementById('driver-run-info').style.display = 'block';
+  document.getElementById('driver-name-display').textContent = `🚚 ${driverName}'s run`;
+
+  // Get most recent upcoming run
+  const today = localToday();
+  const { data: runs } = await db.from('runs').select('*').gte('run_date', today).order('run_date').limit(1);
+  const run = runs && runs[0];
+  if (!run) {
+    document.getElementById('driver-run-meta').textContent = 'No upcoming run found';
+    document.getElementById('driver-stops').innerHTML = '<div class="empty">No run scheduled</div>';
+    document.getElementById('driver-complete-banner').innerHTML = '';
+    document.getElementById('driver-complete-btn-wrap').innerHTML = '';
+    return;
+  }
+  currentDriverRunObj = run;
+  document.getElementById('driver-run-meta').textContent = fmtDate(run.run_date) + (run.name ? ' · ' + run.name : '');
+  startBannerCheck(driverName);
+
+  currentDriverIsLocked = await isDriverCompleted(run.id, driverName);
+
+  const { data: items } = await db.from('items').select('*').eq('run_id', run.id).eq('driver', driverName).order('stop_order', { ascending: true, nullsFirst: false }).order('created_at');
+  if (!items || items.length === 0) {
+    document.getElementById('driver-stops').innerHTML = '<div class="empty">No items assigned to you for this run</div>';
+    document.getElementById('driver-complete-banner').innerHTML = '';
+    document.getElementById('driver-complete-btn-wrap').innerHTML = '';
+    updateDriverProgress(0, 0, 0);
+    return;
+  }
+
+  // Group by pickup location (stops), preserving stop_order
+  const pickups = {};
+  const drops = {};
+  items.forEach(i => {
+    if (!pickups[i.pickup_from]) pickups[i.pickup_from] = [];
+    pickups[i.pickup_from].push(i);
+    if (!drops[i.drop_to]) drops[i.drop_to] = [];
+    drops[i.drop_to].push(i);
+  });
+
+  const collectedCount = items.filter(i => i.status === 'collected' || i.status === 'delivered').length;
+  const flaggedCount = items.filter(i => i.status === 'flagged').length;
+  updateDriverProgress(collectedCount, flaggedCount, items.length);
+
+  // Sort stop groups by their items' stop_order (lowest first; ungrouped/null goes last, original order preserved)
+  const sortStops = (groups) => {
+    return Object.entries(groups).sort((a, b) => {
+      const aOrder = a[1][0].stop_order;
+      const bOrder = b[1][0].stop_order;
+      if (aOrder == null && bOrder == null) return 0;
+      if (aOrder == null) return 1;
+      if (bOrder == null) return -1;
+      return aOrder - bOrder;
+    });
+  };
+
+  let html = '';
+  // PICKUPS section
+  html += `<div class="section-label">Pickups</div>`;
+  sortStops(pickups).forEach(([loc, locItems]) => {
+    html += `<div class="card stop-card stop-pickup" draggable="${!currentDriverIsLocked}" data-stop-group="pickup" data-stop-loc="${esc(loc)}">
+      ${currentDriverIsLocked ? '' : '<div class="stop-drag-handle"><span class="grip">⠿⠿</span> Drag to reorder</div>'}
+      <div class="stop-name">📍 ${esc(loc)}</div>
+      <div class="stop-time">Pick up ${locItems.length} item${locItems.length !== 1 ? 's' : ''}</div>
+      ${locItems.map(item => driverItemRow(item, 'pickup')).join('')}
+    </div>`;
+  });
+
+  html += `<div class="section-label">Drops</div>`;
+  sortStops(drops).forEach(([loc, locItems]) => {
+    html += `<div class="card stop-card stop-drop" draggable="${!currentDriverIsLocked}" data-stop-group="drop" data-stop-loc="${esc(loc)}">
+      ${currentDriverIsLocked ? '' : '<div class="stop-drag-handle"><span class="grip">⠿⠿</span> Drag to reorder</div>'}
+      <div class="stop-name">🎯 ${esc(loc)}</div>
+      <div class="stop-time">Drop off ${locItems.length} item${locItems.length !== 1 ? 's' : ''}</div>
+      ${locItems.map(item => driverItemRow(item, 'drop')).join('')}
+    </div>`;
+  });
+
+  document.getElementById('driver-stops').innerHTML = html;
+  document.getElementById('driver-stops').classList.toggle('run-locked', currentDriverIsLocked);
+
+  // Completion banner / button
+  if (currentDriverIsLocked) {
+    document.getElementById('driver-complete-banner').innerHTML =
+      '<div class="run-complete-banner">✓ Run completed — status changes are locked. Contact admin if you need this reopened.</div>';
+    document.getElementById('driver-complete-btn-wrap').innerHTML = '';
+  } else {
+    document.getElementById('driver-complete-banner').innerHTML = '';
+    document.getElementById('driver-complete-btn-wrap').innerHTML =
+      '<button class="btn btn-success btn-lg" onclick="openCompleteRunModal(\'driver\')">✓ Complete my run</button>';
+  }
+
+  attachStopDragHandlers();
+}
+
+function attachStopDragHandlers() {
+  const container = document.getElementById('driver-stops');
+  if (!container || currentDriverIsLocked) return;
+  const cards = container.querySelectorAll('.stop-card[draggable="true"]');
+  let dragSrc = null;
+
+  cards.forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      dragSrc = card;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      cards.forEach(c => c.classList.remove('drag-over'));
+    });
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      // Only allow dropping within the same group (pickup vs drop)
+      if (!dragSrc || dragSrc === card) return;
+      if (dragSrc.dataset.stopGroup !== card.dataset.stopGroup) return;
+      card.classList.add('drag-over');
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      if (!dragSrc || dragSrc === card) return;
+      if (dragSrc.dataset.stopGroup !== card.dataset.stopGroup) {
+        toast('Can only reorder within Pickups or within Drops');
+        return;
+      }
+      await reorderStops(dragSrc, card);
+    });
+  });
+
+  // Touch support note: native HTML5 drag-and-drop has limited mobile support.
+  // attachTouchDragHandlers provides a pointer-based fallback for touch devices.
+  attachTouchDragHandlers(container, cards);
+}
+
+// Pointer/touch-based drag fallback (HTML5 dragstart/drop don't fire reliably on mobile browsers)
+function attachTouchDragHandlers(container, cards) {
+  let touchSrc = null;
+  let touchStartY = 0;
+  let longPressTimer = null;
+
+  cards.forEach(card => {
+    const handle = card.querySelector('.stop-drag-handle');
+    if (!handle) return;
+
+    handle.addEventListener('touchstart', (e) => {
+      touchSrc = card;
+      touchStartY = e.touches[0].clientY;
+      card.classList.add('dragging');
+    }, { passive: true });
+
+    handle.addEventListener('touchmove', (e) => {
+      if (!touchSrc) return;
+      const touchY = e.touches[0].clientY;
+      const el = document.elementFromPoint(e.touches[0].clientX, touchY);
+      const overCard = el ? el.closest('.stop-card') : null;
+      cards.forEach(c => c.classList.remove('drag-over'));
+      if (overCard && overCard !== touchSrc && overCard.dataset.stopGroup === touchSrc.dataset.stopGroup) {
+        overCard.classList.add('drag-over');
+      }
+    }, { passive: true });
+
+    handle.addEventListener('touchend', async (e) => {
+      if (!touchSrc) return;
+      const lastTouch = e.changedTouches[0];
+      const el = document.elementFromPoint(lastTouch.clientX, lastTouch.clientY);
+      const overCard = el ? el.closest('.stop-card') : null;
+      touchSrc.classList.remove('dragging');
+      cards.forEach(c => c.classList.remove('drag-over'));
+      if (overCard && overCard !== touchSrc) {
+        if (overCard.dataset.stopGroup !== touchSrc.dataset.stopGroup) {
+          toast('Can only reorder within Pickups or within Drops');
+        } else {
+          await reorderStops(touchSrc, overCard);
+        }
+      }
+      touchSrc = null;
+    });
+  });
+}
+
+// Persists a new stop_order: moves dragSrc's stop to sit just before targetCard's stop, within the same group
+async function reorderStops(dragSrcCard, targetCard) {
+  const group = dragSrcCard.dataset.stopGroup;
+  const container = document.getElementById('driver-stops');
+  const groupCards = [...container.querySelectorAll('.stop-card[data-stop-group="' + group + '"]')];
+
+  const fromIdx = groupCards.indexOf(dragSrcCard);
+  const toIdx = groupCards.indexOf(targetCard);
+  if (fromIdx === -1 || toIdx === -1) return;
+
+  // Reorder the array: remove fromIdx, insert before toIdx
+  const reordered = groupCards.slice();
+  const [moved] = reordered.splice(fromIdx, 1);
+  reordered.splice(toIdx, 0, moved);
+
+  // Assign fresh sequential stop_order values (10, 20, 30...) and persist per-location
+  const locField = group === 'pickup' ? 'pickup_from' : 'drop_to';
+  const updates = reordered.map((card, idx) => ({
+    loc: card.dataset.stopLoc,
+    order: (idx + 1) * 10
+  }));
+
+  toast('Saving new order...');
+  for (const u of updates) {
+    await db.from('items')
+      .update({ stop_order: u.order })
+      .eq('run_id', currentDriverRunObj.id)
+      .eq('driver', currentDriverName)
+      .eq(locField, u.loc);
+  }
+  toast('Order updated ✓');
+  loadDriverRun(currentDriverName);
+}
+
+function driverItemRow(item, mode) {
+  const isPickupDone = item.status === 'collected' || item.status === 'delivered';
+  const isDelivered = item.status === 'delivered';
+  const isFlagged = item.status === 'flagged';
+  const locked = currentDriverIsLocked;
+
+  const flagCorner = isFlagged
+    ? '<div class="flag-corner' + (locked ? '' : ' edit-flag-btn') + '" data-id="' + item.id + '" data-desc="' + esc(item.description) + '" data-driver="' + esc(item.driver || '') + '">' +
+        '<span class="flag-wave">🚩</span> Flagged</div>'
+    : '';
+
+  const flagBtn = (isFlagged || locked)
+    ? '' // editing happens via the flag-corner badge instead of a separate button; suppressed entirely when locked
+    : '<button class="btn btn-sm flag-issue-btn" ' +
+      'style="font-size:11px;padding:4px 8px;color:var(--red);border-color:#F7C1C1" ' +
+      'data-id="' + item.id + '" ' +
+      'data-desc="' + esc(item.description) + '" ' +
+      'data-driver="' + esc(item.driver || '') + '">' +
+      '🚩 Flag issue</button>';
+
+  const notesHtml = item.notes
+    ? '<div class="item-route" style="color:var(--amber)">⚠ ' + esc(item.notes) + '</div>'
+    : '';
+
+  if (mode === 'pickup') {
+    let actionBtn;
+    if (isFlagged) {
+      actionBtn = '<span class="badge badge-flagged" style="font-size:11px">Flagged — not collected</span>';
+    } else if (isPickupDone) {
+      actionBtn = '<button class="btn btn-sm" disabled style="cursor:default">✓ Collected</button>';
+    } else if (locked) {
+      actionBtn = '<span class="badge badge-pending" style="font-size:11px">Run locked</span>';
+    } else {
+      actionBtn = '<button class="btn btn-success btn-sm mark-collected-btn" data-id="' + item.id + '">Confirm pickup</button>';
+    }
+    return '<div class="item-row' + (isFlagged ? ' has-flag' : '') + '" style="' + ((isPickupDone || isFlagged) ? 'opacity:0.6' : '') + '">' +
+      flagCorner +
+      '<div class="item-qty">' + item.qty + '</div>' +
+      '<div class="item-info">' +
+        '<div class="item-name">' + esc(item.description) + '</div>' +
+        notesHtml +
+        '<div class="item-route">→ <strong style="color:var(--text)">' + esc(item.drop_to) + '</strong></div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">' +
+        actionBtn + flagBtn +
+      '</div>' +
+    '</div>';
+  } else {
+    let actionBtn;
+    if (isFlagged) {
+      actionBtn = '<span class="badge badge-flagged" style="font-size:11px">Flagged — not delivered</span>';
+    } else if (!isPickupDone) {
+      actionBtn = '<span class="badge badge-pending" style="font-size:11px">Pick up first</span>';
+    } else if (isDelivered) {
+      actionBtn = '<button class="btn btn-sm" disabled style="cursor:default">✓ Delivered</button>';
+    } else if (locked) {
+      actionBtn = '<span class="badge badge-pending" style="font-size:11px">Run locked</span>';
+    } else {
+      actionBtn = '<button class="btn btn-success btn-sm mark-delivered-btn" data-id="' + item.id + '">Confirm drop</button>';
+    }
+    return '<div class="item-row' + (isFlagged ? ' has-flag' : '') + '" style="' + ((isDelivered || isFlagged) ? 'opacity:0.6' : '') + '">' +
+      flagCorner +
+      '<div class="item-qty">' + item.qty + '</div>' +
+      '<div class="item-info">' +
+        '<div class="item-name">' + esc(item.description) + '</div>' +
+        notesHtml +
+        '<div class="item-route">From <strong style="color:var(--text)">' + esc(item.pickup_from) + '</strong></div>' +
+      '</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">' +
+        actionBtn + flagBtn +
+      '</div>' +
+    '</div>';
+  }
+}
+
+async function markCollected(itemId) {
+  if (currentDriverIsLocked) { toast('Run is locked'); return; }
+  await db.from('items').update({ status: 'collected' }).eq('id', itemId);
+  toast('Picked up ✓');
+  loadDriverRun(currentDriverName);
+}
+
+async function markDelivered(itemId) {
+  if (currentDriverIsLocked) { toast('Run is locked'); return; }
+  await db.from('items').update({ status: 'delivered' }).eq('id', itemId);
+  toast('Delivered ✓');
+  loadDriverRun(currentDriverName);
+}
+
+function updateDriverProgress(collected, flagged, total) {
+  const pending = total - collected - flagged;
+  const pct = total > 0 ? Math.round((collected / total) * 100) : 0;
+  document.getElementById('driver-progress').style.width = pct + '%';
+  if (total === 0) {
+    document.getElementById('driver-progress-text').textContent = '';
+    return;
+  }
+  let parts = [collected + ' collected'];
+  if (flagged > 0) parts.push(flagged + ' flagged');
+  if (pending > 0) parts.push(pending + ' pending');
+  document.getElementById('driver-progress-text').textContent = parts.join(' · ') + ` of ${total} (${pct}%)`;
+}
+
+// ---- HUB VIEW ----
+function buildHubSelector() {
+  const el = document.getElementById('hub-selector');
+  el.innerHTML = HUBS.map(loc =>
+    '<div class="run-pill" onclick="loadHubView(\'' + loc + '\')">' + loc + '</div>'
+  ).join('');
+}
+
+async function loadHubView(hubName) {
+  currentHubName = hubName;
+  document.querySelectorAll('#hub-selector .run-pill').forEach(b => b.classList.toggle('active', b.textContent === hubName));
+  document.getElementById('hub-empty').style.display = 'none';
+  document.getElementById('hub-detail').style.display = 'block';
+  document.getElementById('hub-name-display').textContent = `🏪 ${hubName}`;
+  startHubRefresh();
+
+  const today = localToday();
+  const { data: runs } = await db.from('runs').select('*').gte('run_date', today).order('run_date').limit(1);
+  const run = runs && runs[0];
+  if (!run) {
+    document.getElementById('hub-run-meta').textContent = 'No upcoming run';
+    document.getElementById('hub-inbound').innerHTML = '<div class="empty">No run scheduled</div>';
+    document.getElementById('hub-outbound').innerHTML = '';
+    return;
+  }
+  document.getElementById('hub-run-meta').textContent = fmtDate(run.run_date) + (run.name ? ' · ' + run.name : '');
+
+  // Inbound = drop_to is this hub
+  const { data: inbound } = await db.from('items').select('*').eq('run_id', run.id).eq('drop_to', hubName).order('stop_order', { ascending: true, nullsFirst: false });
+  // Outbound = pickup_from is this hub
+  const { data: outbound } = await db.from('items').select('*').eq('run_id', run.id).eq('pickup_from', hubName).order('stop_order', { ascending: true, nullsFirst: false });
+
+  // Hub ready state
+  const { data: readyData } = await db.from('hub_ready').select('*').eq('run_id', run.id).eq('hub_name', hubName).limit(1);
+  const isReady = readyData && readyData.length > 0 && readyData[0].is_ready;
+  document.getElementById('hub-ready-btn').textContent = isReady ? '✓ Ready' : 'Mark ready ✓';
+  document.getElementById('hub-ready-btn').className = `btn ${isReady ? '' : 'btn-success'} btn-sm`;
+  document.getElementById('hub-ready-label').textContent = isReady ? 'Your produce is marked as ready for pickup' : 'Mark your produce as packed and ready';
+
+  // --- STATUS BAR ---
+  updateHubStatusBar(inbound, outbound);
+
+  const renderItems = (items, emptyMsg) => {
+    if (!items || items.length === 0) return `<div class="empty" style="padding:16px">${emptyMsg}</div>`;
+    return `<div class="card">${items.map(item => {
+      const isFlagged = item.status === 'flagged';
+      const flagCorner = isFlagged
+        ? `<div class="flag-corner hub-flag-tile" data-id="${item.id}"><span class="flag-wave">🚩</span> Flagged</div>`
+        : '';
+      const statusBadge = isFlagged
+        ? ''
+        : `<span class="badge badge-${item.status || 'pending'}">${item.status || 'pending'}</span>`;
+      return `
+      <div class="item-row ${isFlagged ? 'hub-flag-tile has-flag' : ''}" ${isFlagged ? `data-id="${item.id}"` : ''} style="${isFlagged ? 'cursor:pointer' : ''}">
+        ${flagCorner}
+        <div class="item-qty">${item.qty}</div>
+        <div class="item-info">
+          <div class="item-name">${esc(item.description)}</div>
+          <div class="item-route">From ${esc(item.pickup_from)} · Driver: ${esc(item.driver || '—')}</div>
+          ${item.notes ? `<div class="item-route" style="color:var(--amber)">⚠ ${esc(item.notes)}</div>` : ''}
+        </div>
+        ${statusBadge}
+      </div>
+    `;
+    }).join('')}</div>`;
+  };
+
+  document.getElementById('hub-inbound').innerHTML = renderItems(inbound, 'Nothing arriving today');
+  document.getElementById('hub-outbound').innerHTML = renderItems(outbound, 'Nothing leaving from here today');
+}
+
+function updateHubStatusBar(inbound, outbound) {
+  const bar = document.getElementById('hub-status-bar');
+  if (!inbound || inbound.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'block';
+
+  // Step 0: all inbound items collected (status = collected or delivered)
+  const totalInbound = inbound.length;
+  const collectedCount = inbound.filter(i => i.status === 'collected' || i.status === 'delivered').length;
+  const allCollected = collectedCount === totalInbound;
+
+  // Step 1: driver en route = at least one collected but not yet all delivered to this hub
+  const deliveredCount = inbound.filter(i => i.status === 'delivered').length;
+  const allDelivered = deliveredCount === totalInbound;
+
+  // Step 2: all delivered
+  const step0 = document.getElementById('hstep-0');
+  const step1 = document.getElementById('hstep-1');
+  const step2 = document.getElementById('hstep-2');
+  const caption = document.getElementById('hub-status-caption');
+
+  // Reset
+  [step0, step1, step2].forEach(s => { s.classList.remove('done', 'active'); });
+  caption.className = 'hub-status-caption';
+
+  if (allDelivered) {
+    step0.classList.add('done');
+    step1.classList.add('done');
+    step2.classList.add('done');
+    caption.textContent = '✓ All your items have been delivered';
+    caption.className = 'hub-status-caption good';
+  } else if (allCollected) {
+    step0.classList.add('done');
+    step1.classList.add('active');
+    const remaining = totalInbound - deliveredCount;
+    caption.textContent = `Driver has collected everything — ${remaining} item${remaining !== 1 ? 's' : ''} heading your way`;
+  } else if (collectedCount > 0) {
+    step0.classList.add('active');
+    const stillNeeded = totalInbound - collectedCount;
+    caption.textContent = `${collectedCount} of ${totalInbound} items collected — ${stillNeeded} still to be picked up`;
+  } else {
+    step0.classList.add('active');
+    caption.textContent = `Waiting for driver to start collections (${totalInbound} item${totalInbound !== 1 ? 's' : ''} inbound)`;
+  }
+}
+
+async function toggleHubReady() {
+  if (!currentHubName) return;
+  const today = localToday();
+  const { data: runs } = await db.from('runs').select('*').gte('run_date', today).order('run_date').limit(1);
+  const run = runs && runs[0];
+  if (!run) return;
+
+  const { data: existing } = await db.from('hub_ready').select('*').eq('run_id', run.id).eq('hub_name', currentHubName).limit(1);
+  if (existing && existing.length > 0) {
+    const newVal = !existing[0].is_ready;
+    await db.from('hub_ready').update({ is_ready: newVal }).eq('id', existing[0].id);
+    toast(newVal ? 'Marked as ready ✓' : 'Ready status removed');
+  } else {
+    await db.from('hub_ready').insert({ run_id: run.id, hub_name: currentHubName, is_ready: true });
+    toast('Marked as ready ✓');
+  }
+  loadHubView(currentHubName);
+}
+
+// ---- UI HELPERS ----
+function switchView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelector(`.role-btn[onclick="switchView('${name}')"]`).classList.add('active');
+  if (name === 'admin') { loadRuns(); populateSelects(); }
+}
+
+function adminTab(tab) {
+  if (tab === 'status') { startStatusRefresh(); } else { stopStatusRefresh(); }
+  const tabs = ['manifest','add-item','import','status'];
+  document.querySelectorAll('.tabs .tab').forEach((t, i) => t.classList.toggle('active', tabs[i] === tab));
+  document.getElementById('tab-manifest').style.display = tab === 'manifest' ? '' : 'none';
+  document.getElementById('tab-add-item').style.display = tab === 'add-item' ? '' : 'none';
+  document.getElementById('tab-import').style.display = tab === 'import' ? '' : 'none';
+  document.getElementById('tab-status').style.display = tab === 'status' ? '' : 'none';
+  if (tab === 'status') loadStatusOverview();
+  if (tab === 'add-item') populateSelects();
+}
+
+function showNewRunModal() { document.getElementById('new-run-modal').style.display = 'flex'; }
+function hideNewRunModal() { document.getElementById('new-run-modal').style.display = 'none'; }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.display = 'none'; }, 2800);
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- WHATSAPP PARSER ----
+let parsedItems = [];
+
+async function parseWhatsApp() {
+  if (!currentRunId) { toast('Select a run first'); return; }
+  const text = document.getElementById('whatsapp-paste').value.trim();
+  if (!text) { toast('Paste a message first'); return; }
+
+  const btn = document.getElementById('parse-btn');
+  const status = document.getElementById('parse-status');
+  btn.disabled = true;
+  btn.textContent = 'Parsing...';
+  status.textContent = 'Reading message...';
+
+  const locationsList = ALL_KNOWN_LOCATIONS.join(', ');
+  const driversList = DRIVERS.join(', ');
+
+  const prompt = `You are helping parse a WhatsApp logistics message for a food co-op run in North East Victoria, Australia.
+
+Known locations: ${locationsList}
+Known drivers: ${driversList}
+
+The message below describes produce pickups and drop-offs for a delivery run. Extract every item and return ONLY a JSON array, no other text.
+
+Each object in the array must have:
+- "description": item name/description (string)
+- "qty": quantity as a number (default 1 if not specified)
+- "pickup_from": where to collect it from — match to a known location if possible, otherwise use the text as-is
+- "drop_to": where to deliver it — match to a known location if possible. If unclear, use "Bright Food Co-op" as default hub
+- "driver": Assign based on the DROP destination, not who the message is addressed to. Use "Bright Loop" for drops to: Bright Food Co-op, Bright Brewery, BotanicAlps, Basil's, Gamila of Beechworth, Bright Organics, NE Foods, Myrtleford, Farm to Fork Butchery, Mt Beauty. Use "SKVFH & A&A Loop" for drops to: Sustainable King Valley Food Hub, Acres & Acres, HowNow Dairy Numurkah, Corryong, King Valley. If truly unclear, use "Bright Loop"
+- "notes": any special instructions or notes (string, empty if none)
+
+Rules:
+- Return ONLY a raw JSON array. No markdown. No backticks. No explanation. No emoji in values. Use only straight ASCII double quotes. No trailing commas. No smart quotes or curly apostrophes - use straight apostrophes only.
+- "Lomandra" means "Lomandra Farms"
+- "Murmungee" means "Murmungee Basin Produce"  
+- "Silvercreek" or "Silver Creek" means "Silver Creek Sourdough"
+- "NE foods" means "NE Foods"
+- "Farm to Fork" means "Farm to Fork Butchery"
+- "Markwood" means "Markwood Mushrooms"
+- "Honeybird" means "Honeybird"
+- "Acres and Acres" or "A&A" or "Acres & Acres" means "Acres & Acres"
+- "SKVFH" or "King Valley Hub" or "Sustainable King Valley" means "Sustainable King Valley Food Hub"
+- "Bright CoOp" or "Bright Co-op" means "Bright Food Co-op"
+- "BotanicAlps" means "BotanicAlps"
+- Empty containers/kegs/tubs going back are still items — include them
+- If a message is addressed to a specific driver (e.g. "Hey Rolf"), items in that message default to that driver
+- Items going to Bright Brewery, BotanicAlps, or Basil's are drop points, not hubs
+
+Message:
+${text}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': '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', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await response.json();
+    console.log('API response:', JSON.stringify(data));
+    if (data.error) throw new Error('API error: ' + data.error.message);
+    const raw = data.content && data.content[0] && data.content[0].text;
+    if (!raw) throw new Error('No content in response — check API key and model name');
+    console.log('Raw text:', raw);
+
+    let clean = raw.replace(/```json|```/gi, '').trim();
+    const start = clean.indexOf('[');
+    const end = clean.lastIndexOf(']');
+    if (start === -1 || end === -1) throw new Error('No JSON array found — got: ' + clean.slice(0,100));
+    clean = clean.slice(start, end + 1);
+    try {
+      parsedItems = JSON.parse(clean);
+    } catch(jsonErr) {
+      // Last resort: use Function to evaluate (handles minor issues)
+      console.warn('Strict JSON failed, trying eval approach:', jsonErr.message);
+      console.log('Problematic JSON:', clean);
+      throw new Error('JSON still invalid after cleanup: ' + jsonErr.message + ' — check console for details');
+    }
+
+    renderParsedItems();
+    status.textContent = parsedItems.length + ' items found — review below';
+    document.getElementById('parsed-results').style.display = 'block';
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    console.error('Parse error:', e);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Parse message';
+}
+
+function renderParsedItems() {
+  const list = document.getElementById('parsed-items-list');
+  list.innerHTML = parsedItems.map((item, i) => `
+    <div class="card" style="margin-bottom:10px;padding:14px" id="parsed-${i}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:15px;margin-bottom:6px">
+            <span style="color:var(--green);margin-right:6px">${item.qty}x</span>${esc(item.description)}
+          </div>
+          <div style="font-size:13px;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:8px">
+            <span>📍 ${esc(item.pickup_from)}</span>
+            <span>→</span>
+            <span style="color:var(--text);font-weight:500">🎯 ${esc(item.drop_to)}</span>
+            <span>🚚 ${esc(item.driver)}</span>
+            ${item.notes ? '<span style="color:var(--amber)">⚠ ' + esc(item.notes) + '</span>' : ''}
+          </div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeParsedItem(${i})" style="flex-shrink:0">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function removeParsedItem(i) {
+  parsedItems.splice(i, 1);
+  if (parsedItems.length === 0) {
+    document.getElementById('parsed-results').style.display = 'none';
+  } else {
+    renderParsedItems();
+  }
+}
+
+async function confirmImport() {
+  if (!currentRunId) { toast('Select a run first'); return; }
+  if (parsedItems.length === 0) return;
+
+  const rows = parsedItems.map(item => ({
+    run_id: currentRunId,
+    description: item.description,
+    qty: item.qty || 1,
+    pickup_from: item.pickup_from,
+    drop_to: item.drop_to,
+    driver: item.driver,
+    notes: item.notes || '',
+    status: 'pending'
+  }));
+
+  const { error } = await db.from('items').insert(rows);
+  if (error) { toast('Error saving items'); console.error(error); return; }
+
+  toast(rows.length + ' items added to run ✓');
+  parsedItems = [];
+  document.getElementById('parsed-results').style.display = 'none';
+  document.getElementById('whatsapp-paste').value = '';
+  document.getElementById('parse-status').textContent = '';
+  loadManifest();
+  loadStatusOverview();
+  adminTab('manifest');
+}
+
+// ---- ISSUE FLAGGING (driver side: create or edit own flag) ----
+let currentIssueItemId = null;
+let currentIssueDriver = null;
+let currentIssueId = null; // set when editing an existing issue
+let selectedReason = null;
+
+async function showIssueModal(itemId, itemDesc, driver, isEdit) {
+  currentIssueItemId = itemId;
+  currentIssueDriver = driver;
+  currentIssueId = null;
+  selectedReason = null;
+  document.getElementById('issue-item-name').textContent = itemDesc;
+  document.getElementById('issue-notes').value = '';
+  document.getElementById('issue-hub-reply-box').style.display = 'none';
+  document.getElementById('issue-resolved-row').style.display = isEdit ? 'block' : 'none';
+  document.querySelectorAll('.issue-reason-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('issue-modal-title').textContent = isEdit ? 'Edit your flag' : 'Flag an issue';
+  document.getElementById('issue-submit-btn').textContent = isEdit ? 'Update flag' : 'Submit flag';
+
+  if (isEdit) {
+    // Load the most recent issue for this item so the driver can edit it
+    const { data: issues } = await db.from('issues').select('*').eq('item_id', itemId).order('created_at', { ascending: false }).limit(1);
+    const existing = issues && issues[0];
+    if (existing) {
+      currentIssueId = existing.id;
+      selectedReason = existing.reason;
+      document.getElementById('issue-notes').value = existing.notes || '';
+      document.querySelectorAll('.issue-reason-btn').forEach(b => {
+        b.classList.toggle('selected', existing.reason && b.textContent.includes(existing.reason));
+      });
+      if (existing.hub_reply) {
+        document.getElementById('issue-hub-reply-box').style.display = 'block';
+        document.getElementById('issue-hub-reply-text').textContent = existing.hub_reply;
+      }
+    }
+  }
+
+  document.getElementById('issue-modal').style.display = 'block';
+}
+
+function hideIssueModal() {
+  document.getElementById('issue-modal').style.display = 'none';
+  currentIssueItemId = null;
+  currentIssueId = null;
+  selectedReason = null;
+}
+
+function selectReason(reason) {
+  selectedReason = reason;
+  document.querySelectorAll('.issue-reason-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.includes(reason));
+  });
+}
+
+async function submitIssue() {
+  if (!selectedReason) { toast('Select a reason first'); return; }
+  if (!currentIssueItemId) return;
+  const notes = document.getElementById('issue-notes').value.trim();
+
+  if (currentIssueId) {
+    // Editing an existing flag - update in place
+    const isResolved = selectedReason === 'Found / Resolved';
+    const { error } = await db.from('issues').update({
+      reason: selectedReason,
+      notes,
+      updated_at: new Date().toISOString()
+    }).eq('id', currentIssueId);
+    if (error) { toast('Could not update issue'); console.error(error); return; }
+
+    if (isResolved) {
+      // Clear the flag — item goes back to pending so the driver can collect/deliver it normally
+      const { error: itemError } = await db.from('items').update({ status: 'pending' }).eq('id', currentIssueItemId);
+      if (itemError) { toast('Could not clear flag on item'); console.error(itemError); return; }
+      toast('Marked as found ✓');
+    } else {
+      toast('Flag updated ✓');
+    }
+  } else {
+    const today = localToday();
+    const { data: runs } = await db.from('runs').select('*').gte('run_date', today).order('run_date').limit(1);
+    const run = runs && runs[0];
+
+    const { error } = await db.from('issues').insert({
+      item_id: currentIssueItemId,
+      run_id: run ? run.id : null,
+      driver: currentIssueDriver,
+      reason: selectedReason,
+      notes
+    });
+    if (error) { toast('Could not save issue'); console.error(error); return; }
+
+    // Mark item as flagged
+    await db.from('items').update({ status: 'flagged' }).eq('id', currentIssueItemId);
+    toast('Issue flagged ✓');
+  }
+
+  hideIssueModal();
+  if (currentDriverName) loadDriverRun(currentDriverName);
+}
+
+// ---- FLAG DETAIL (hub side: view + reply) ----
+let currentFlagItemId = null;
+let currentFlagIssueId = null;
+
+async function showFlagDetailModal(itemId) {
+  currentFlagItemId = itemId;
+  currentFlagIssueId = null;
+
+  const { data: items } = await db.from('items').select('*').eq('id', itemId).limit(1);
+  const item = items && items[0];
+  document.getElementById('flag-detail-item-name').textContent = item ? item.description : '';
+
+  const { data: issues } = await db.from('issues').select('*').eq('item_id', itemId).order('created_at', { ascending: false }).limit(1);
+  const issue = issues && issues[0];
+
+  if (issue) {
+    currentFlagIssueId = issue.id;
+    document.getElementById('flag-detail-reason').textContent = issue.reason || '—';
+    document.getElementById('flag-detail-notes').textContent = issue.notes || 'No notes added';
+    const when = issue.created_at ? new Date(issue.created_at).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    document.getElementById('flag-detail-meta').textContent = 'Flagged by ' + (issue.driver || 'driver') + (when ? ' · ' + when : '');
+    document.getElementById('flag-reply-input').value = issue.hub_reply || '';
+  } else {
+    document.getElementById('flag-detail-reason').textContent = '—';
+    document.getElementById('flag-detail-notes').textContent = 'No details found for this flag';
+    document.getElementById('flag-detail-meta').textContent = '';
+    document.getElementById('flag-reply-input').value = '';
+  }
+
+  document.getElementById('flag-detail-modal').style.display = 'block';
+}
+
+function hideFlagDetailModal() {
+  document.getElementById('flag-detail-modal').style.display = 'none';
+  currentFlagItemId = null;
+  currentFlagIssueId = null;
+}
+
+async function submitHubReply() {
+  if (!currentFlagIssueId) { toast('No flag to reply to'); return; }
+  const reply = document.getElementById('flag-reply-input').value.trim();
+  const { error } = await db.from('issues').update({
+    hub_reply: reply,
+    updated_at: new Date().toISOString()
+  }).eq('id', currentFlagIssueId);
+  if (error) { toast('Could not save reply'); console.error(error); return; }
+  toast('Reply saved ✓');
+  hideFlagDetailModal();
+  if (currentHubName) loadHubView(currentHubName);
+}
+
+// ---- COMPLETE RUN MODAL (shared by driver & admin) ----
+let completeRunContext = null; // 'driver' or 'admin'
+
+async function openCompleteRunModal(context) {
+  completeRunContext = context;
+  let run, scopeLabel, eligibleCount;
+
+  if (context === 'driver') {
+    run = currentDriverRunObj;
+    if (!run) { toast('No run loaded'); return; }
+    const { data: items } = await db.from('items').select('*').eq('run_id', run.id).eq('driver', currentDriverName);
+    eligibleCount = (items || []).filter(i => i.status === 'flagged' || i.status === 'pending' || !i.status).length;
+    scopeLabel = currentDriverName;
+  } else {
+    if (!currentRunId) { toast('No run selected'); return; }
+    const { data: runs } = await db.from('runs').select('*').eq('id', currentRunId).limit(1);
+    run = runs && runs[0];
+    if (!run) { toast('Run not found'); return; }
+    const { data: items } = await db.from('items').select('*').eq('run_id', run.id);
+    eligibleCount = (items || []).filter(i => i.status === 'flagged' || i.status === 'pending' || !i.status).length;
+    scopeLabel = 'the whole run (all drivers)';
+  }
+
+  document.getElementById('complete-run-summary').textContent =
+    `Completing ${scopeLabel}. ${eligibleCount} item${eligibleCount !== 1 ? 's' : ''} not yet collected/delivered will be carried over to next week.`;
+  document.getElementById('complete-run-modal').style.display = 'block';
+}
+
+function hideCompleteRunModal() {
+  document.getElementById('complete-run-modal').style.display = 'none';
+  completeRunContext = null;
+}
+
+async function confirmCompleteRun() {
+  if (completeRunContext === 'driver') {
+    const run = currentDriverRunObj;
+    const carried = await completeDriverRun(run, currentDriverName);
+    hideCompleteRunModal();
+    if (carried === null) return;
+    toast(`Run completed ✓${carried ? ' — ' + carried + ' item(s) carried to next week' : ''}`);
+    loadDriverRun(currentDriverName);
+  } else {
+    const { data: runs } = await db.from('runs').select('*').eq('id', currentRunId).limit(1);
+    const run = runs && runs[0];
+    if (!run) { toast('Run not found'); hideCompleteRunModal(); return; }
+    const carried = await completeWholeRun(run);
+    hideCompleteRunModal();
+    toast(`Run completed ✓${carried ? ' — ' + carried + ' item(s) carried to next week' : ''}`);
+    loadStatusOverview();
+  }
+}
+
+// ---- NEW ITEM BANNER ----
+let lastKnownItemCount = 0;
+let bannerCheckInterval = null;
+let hubRefreshInterval = null;
+let statusRefreshInterval = null;
+
+function startBannerCheck(driverRoute) {
+  if (bannerCheckInterval) clearInterval(bannerCheckInterval);
+  bannerCheckInterval = setInterval(async () => {
+    const today = localToday();
+    const { data: runs } = await db.from('runs').select('*').gte('run_date', today).order('run_date').limit(1);
+    const run = runs && runs[0];
+    if (!run) return;
+    const { count } = await db.from('items').select('*', { count: 'exact', head: true }).eq('run_id', run.id).eq('driver', driverRoute);
+    if (lastKnownItemCount > 0 && count > lastKnownItemCount) {
+      document.getElementById('new-items-banner').style.display = 'block';
+      // Push banner down so it doesn't cover the top bar
+      document.getElementById('new-items-banner').style.top = '48px';
+    }
+    lastKnownItemCount = count;
+  }, 30000); // check every 30 seconds
+}
+
+function dismissBanner() {
+  document.getElementById('new-items-banner').style.display = 'none';
+  if (currentDriverName) loadDriverRun(currentDriverName);
+}
+
+// ---- HOME & PIN ----
+const ADMIN_PIN = '1234';
+let pinEntry = '';
+
+function showHome() {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-home').classList.add('active');
+  document.getElementById('home-btn').style.display = 'none';
+  document.getElementById('top-bar-title').textContent = '🌿 NE Vic Run Sheet';
+  stopHubRefresh();
+  stopStatusRefresh();
+}
+
+function goDriver() {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-driver').classList.add('active');
+  document.getElementById('home-btn').style.display = 'block';
+  document.getElementById('top-bar-title').textContent = '🚚 Driver Run';
+}
+
+function goHub() {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-hub').classList.add('active');
+  document.getElementById('home-btn').style.display = 'block';
+  document.getElementById('top-bar-title').textContent = '🏪 Hub View';
+  buildHubSelector();
+}
+
+function startHubRefresh() {
+  if (hubRefreshInterval) clearInterval(hubRefreshInterval);
+  hubRefreshInterval = setInterval(() => {
+    if (currentHubName) loadHubView(currentHubName);
+  }, 30000);
+}
+
+function stopHubRefresh() {
+  if (hubRefreshInterval) { clearInterval(hubRefreshInterval); hubRefreshInterval = null; }
+}
+
+function startStatusRefresh() {
+  if (statusRefreshInterval) clearInterval(statusRefreshInterval);
+  statusRefreshInterval = setInterval(() => {
+    loadStatusOverview();
+  }, 30000);
+}
+
+function stopStatusRefresh() {
+  if (statusRefreshInterval) { clearInterval(statusRefreshInterval); statusRefreshInterval = null; }
+}
+
+function goAdmin() {
+  pinEntry = '';
+  updatePinDots();
+  document.getElementById('pin-modal').style.display = 'flex';
+}
+
+function hidePinModal() {
+  document.getElementById('pin-modal').style.display = 'none';
+  pinEntry = '';
+  updatePinDots();
+}
+
+function pinPress(val) {
+  if (val === 'del') {
+    pinEntry = pinEntry.slice(0, -1);
+  } else if (pinEntry.length < 4) {
+    pinEntry += val;
+  }
+  updatePinDots();
+  if (pinEntry.length === 4) {
+    setTimeout(() => {
+      if (pinEntry === ADMIN_PIN) {
+        hidePinModal();
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById('view-admin').classList.add('active');
+        document.getElementById('home-btn').style.display = 'block';
+        document.getElementById('top-bar-title').textContent = '⚙️ Admin';
+        loadRuns();
+        populateSelects();
+      } else {
+        pinEntry = '';
+        updatePinDots();
+        toast('Incorrect PIN');
+      }
+    }, 200);
+  }
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('dot-' + i);
+    if (dot) dot.classList.toggle('filled', i < pinEntry.length);
+  }
+}
+
+// ---- INIT ----
+window.addEventListener('DOMContentLoaded', () => {
+  // Set default run date to next Thursday
+  const d = new Date();
+  const daysUntilThursday = (4 - d.getDay() + 7) % 7 || 7;
+  d.setDate(d.getDate() + daysUntilThursday);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  document.getElementById('new-run-date').value = `${y}-${m}-${day}`;
+
+  // Start on home screen
+  showHome();
+
+  // Delegated handler for flag issue buttons
+  document.addEventListener('click', function(e) {
+    const flagBtn = e.target.closest('.flag-issue-btn');
+    if (flagBtn) {
+      showIssueModal(flagBtn.dataset.id, flagBtn.dataset.desc, flagBtn.dataset.driver, false);
+      return;
+    }
+    const editFlagBtn = e.target.closest('.edit-flag-btn');
+    if (editFlagBtn) {
+      showIssueModal(editFlagBtn.dataset.id, editFlagBtn.dataset.desc, editFlagBtn.dataset.driver, true);
+      return;
+    }
+    const collectBtn = e.target.closest('.mark-collected-btn');
+    if (collectBtn) {
+      markCollected(collectBtn.dataset.id);
+      return;
+    }
+    const deliverBtn = e.target.closest('.mark-delivered-btn');
+    if (deliverBtn) {
+      markDelivered(deliverBtn.dataset.id);
+      return;
+    }
+    const hubFlagTile = e.target.closest('.hub-flag-tile');
+    if (hubFlagTile) {
+      showFlagDetailModal(hubFlagTile.dataset.id);
+      return;
+    }
+    const reopenBtn = e.target.closest('.reopen-driver-btn');
+    if (reopenBtn) {
+      reopenDriverAndRefresh(reopenBtn.dataset.driver);
+      return;
+    }
+  });
+});
+</script>
+</body>
+</html>
