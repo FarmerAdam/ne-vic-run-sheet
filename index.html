@@ -1696,9 +1696,9 @@ Message:
 ${text}`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://neviclogistics-proxy.adam-c52.workers.dev/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': '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', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
         max_tokens: 4000,
