@@ -292,7 +292,10 @@
       <div class="run-date" id="admin-run-date">Loading runs...</div>
       <div class="run-meta" id="admin-run-meta"></div>
     </div>
-    <button class="btn btn-primary" onclick="showNewRunModal()">+ New run</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-danger btn-sm" onclick="confirmDeleteRun()" id="delete-run-btn">🗑 Delete run</button>
+      <button class="btn btn-primary" onclick="showNewRunModal()">+ New run</button>
+    </div>
   </div>
 
   <div class="run-selector" id="admin-run-selector"></div>
@@ -630,8 +633,11 @@ async function loadRuns() {
   if (allRuns.length > 0) {
     selectRun(allRuns[0].id);
   } else {
+    currentRunId = null;
     document.getElementById('admin-run-date').textContent = 'No runs yet';
+    document.getElementById('admin-run-meta').textContent = '';
     document.getElementById('admin-manifest-list').innerHTML = '<div class="empty"><div style="font-size:36px;margin-bottom:8px">📋</div><div>Create your first run above</div></div>';
+    document.getElementById('status-overview').innerHTML = '<div class="empty">No runs yet</div>';
   }
 }
 
@@ -1014,6 +1020,45 @@ async function createRun() {
   toast('Run created!');
   await loadRuns();
   selectRun(data.id);
+}
+
+// Deletes a run and everything tied to it (items, issues, driver_completions, hub_ready).
+// Built after a timezone bug once required doing this by hand in SQL — this is the safety-net version.
+async function confirmDeleteRun() {
+  if (!currentRunId) return;
+  const run = allRuns.find(r => r.id === currentRunId);
+  if (!run) return;
+
+  const { count: itemCount } = await db.from('items').select('*', { count: 'exact', head: true }).eq('run_id', currentRunId);
+
+  const label = fmtDate(run.run_date) + (run.name ? ' · ' + run.name : '');
+  const msg = `Delete the run for ${label}?\n\nThis permanently removes ${itemCount || 0} item${itemCount === 1 ? '' : 's'}, plus any flagged issues, driver completions, and hub-ready marks for this run. This cannot be undone.`;
+  if (!confirm(msg)) return;
+
+  await deleteRun(currentRunId);
+}
+
+async function deleteRun(runId) {
+  // Delete children before the run itself, and issues before items (issues reference items).
+  const steps = [
+    ['issues', () => db.from('issues').delete().eq('run_id', runId)],
+    ['items', () => db.from('items').delete().eq('run_id', runId)],
+    ['driver_completions', () => db.from('driver_completions').delete().eq('run_id', runId)],
+    ['hub_ready', () => db.from('hub_ready').delete().eq('run_id', runId)],
+    ['runs', () => db.from('runs').delete().eq('id', runId)],
+  ];
+  for (const [table, fn] of steps) {
+    const { error } = await fn();
+    if (error) {
+      console.error('Delete failed at table: ' + table, error);
+      toast('Delete failed at "' + table + '" — check console. Earlier steps already ran.');
+      await loadRuns();
+      return;
+    }
+  }
+
+  toast('Run deleted');
+  await loadRuns(); // re-selects the most recent remaining run, or shows the empty state if none are left
 }
 
 // ---- RUN COMPLETION & CARRY-OVER ----
