@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NE Vic Run Sheet</title>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800&family=Poppins:wght@900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Poppins:wght@800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -12,16 +12,18 @@
     --brand-dark: #d4a012;
     --amber: #7a4e10;
     --amber-on-white: #5a3608;
+    --amber-display: #ba801c; /* Bright Food Co-op's amber — large/bold display text on light bg only, not enough contrast for small text */
     --amber-light: #fef6d8;
+    --olive: #687e50; /* Bright Food Co-op's decorative accent — illustration/flourish use, not status colour */
     --green: #3B6D11;
     --green-light: #EAF3DE;
     --green-mid: #639922;
     --red: #A32D2D;
     --red-light: #FCEBEB;
-    --gray: #5F5E5A;
+    --gray: #5e5247;
     --gray-light: #F1EFE8;
     --gray-border: #D3D1C7;
-    --text: #2C2C2A;
+    --text: #5e5247;
     --text-muted: #888780;
     --white: #ffffff;
     --bg: #fdf9ee;
@@ -76,7 +78,7 @@
 
   /* RUN OVERVIEW */
   .run-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-  .run-date { font-size: 22px; font-weight: 900; font-family: 'Poppins', sans-serif; color: var(--amber-on-white); }
+  .run-date { font-size: 22px; font-weight: 900; font-family: 'Poppins', sans-serif; color: var(--amber-display); }
   .run-meta { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
   .run-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
   .run-pill { padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--gray-border); background: var(--white); font-size: 13px; font-weight: 500; cursor: pointer; }
@@ -210,58 +212,58 @@
 <div class="view active" id="view-home">
   <div id="home-screen">
     <div style="text-align:center;padding:32px 20px 24px">
-      <!-- Produce SVG illustration -->
+      <!-- Produce illustration — hand-drawn line-art style, echoing Bright Food Co-op's icon set -->
       <svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:340px;margin:0 auto 8px;display:block">
-        <!-- Background circle -->
-        <circle cx="160" cy="80" r="75" fill="#fef6d8" opacity="0.8"/>
+        <!-- Background halo -->
+        <circle cx="160" cy="80" r="75" fill="var(--amber-light)" opacity="0.8"/>
 
-        <!-- Mushrooms (left) -->
-        <ellipse cx="72" cy="105" rx="18" ry="6" fill="#c97a2a" opacity="0.4"/>
-        <path d="M60 105 Q60 78 72 75 Q84 78 84 105Z" fill="#e8943a"/>
-        <path d="M56 90 Q56 68 72 65 Q88 68 88 90" fill="#b8602a"/>
-        <circle cx="68" cy="78" r="3" fill="#fef6d8" opacity="0.5"/>
-        <circle cx="76" cy="72" r="2" fill="#fef6d8" opacity="0.5"/>
-        <!-- Second mushroom -->
-        <ellipse cx="95" cy="108" rx="12" ry="4" fill="#c97a2a" opacity="0.4"/>
-        <path d="M86 108 Q86 90 95 88 Q104 90 104 108Z" fill="#e8943a"/>
-        <path d="M83 96 Q83 80 95 78 Q107 80 107 96" fill="#b8602a"/>
+        <!-- Sneaky mushroom (drawn first — the bread loaf masks most of it, just the foot peeks out) -->
+        <g stroke="var(--amber-display)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <path d="M126 112 Q126 98 140 96 Q154 98 154 112 Q154 118 140 119 Q126 118 126 112 Z"/>
+          <path d="M133 118 Q133 116 140 116 Q147 116 147 118 L147 142 Q147 150 140 150 Q133 150 133 142 Z"/>
+        </g>
 
-        <!-- Bread loaf (centre) -->
-        <ellipse cx="160" cy="112" rx="30" ry="8" fill="#c97a2a" opacity="0.3"/>
-        <path d="M132 112 Q132 85 160 82 Q188 85 188 112Z" fill="#e8b86d"/>
-        <path d="M135 100 Q140 88 160 85 Q180 88 185 100" fill="#d4954a" stroke="none"/>
-        <line x1="148" y1="95" x2="172" y2="95" stroke="#c97a2a" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
-        <line x1="145" y1="102" x2="175" y2="102" stroke="#c97a2a" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+        <!-- Carrot (left) -->
+        <g stroke="var(--amber-display)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" transform="rotate(-4 70 75)">
+          <path d="M63 34 C 58 24 50 16 40 11"/>
+          <path d="M68 32 C 67 19 69 8 66 1"/>
+          <path d="M76 33 C 82 23 91 16 100 13"/>
+          <path d="M73 33 C 76 21 83 12 90 9"/>
+          <path d="M58 35 C 54 33 50 38 51 50 C 52 68 58 95 68 118 C 70 122 74 122 76 118 C 84 95 90 68 89 48 C 88 36 82 32 78 34 C 72 31 64 32 58 35 Z"/>
+          <path d="M57 54 Q67 57 77 53" stroke-width="2"/>
+          <path d="M59 70 Q67 73 75 69" stroke-width="2"/>
+          <path d="M62 86 Q68 88 73 85" stroke-width="2"/>
+        </g>
 
-        <!-- Cheese wedge (right) -->
-        <polygon points="230,115 260,115 255,85" fill="#f5c842"/>
-        <polygon points="230,115 260,115 255,85" fill="#f5c842"/>
-        <polygon points="228,113 258,113 253,83" fill="#f7d060" opacity="0.7"/>
-        <circle cx="248" cy="102" r="3" fill="#e8a820" opacity="0.7"/>
-        <circle cx="240" cy="108" r="2" fill="#e8a820" opacity="0.7"/>
-        <circle cx="252" cy="108" r="2" fill="#e8a820" opacity="0.5"/>
+        <!-- Bread loaf (centre) — fill matches the halo, so it quietly masks the mushroom beneath it -->
+        <g stroke="var(--amber-display)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M118 125 C 115 95, 140 78, 172 78 C 204 78, 226 95, 222 122 C 220 132, 200 134, 172 134 C 144 134, 120 133, 118 125 Z" fill="var(--amber-light)"/>
+          <path d="M148 90 L160 78" fill="none"/>
+          <path d="M168 86 L180 74" fill="none"/>
+          <path d="M188 88 L198 78" fill="none"/>
+        </g>
+        <g fill="var(--amber-display)">
+          <circle cx="160" cy="95" r="1.4"/>
+          <circle cx="178" cy="92" r="1.4"/>
+          <circle cx="195" cy="96" r="1.4"/>
+          <circle cx="145" cy="100" r="1.4"/>
+        </g>
 
-        <!-- Leafy greens (far right) -->
-        <ellipse cx="285" cy="108" rx="10" ry="4" fill="#3B6D11" opacity="0.3"/>
-        <path d="M278 108 Q274 92 285 88 Q290 94 288 108Z" fill="#5a9e1a"/>
-        <path d="M285 108 Q282 90 292 86 Q296 93 293 108Z" fill="#3B6D11"/>
-        <path d="M290 108 Q292 94 298 92 Q299 98 295 108Z" fill="#5a9e1a"/>
-
-        <!-- Milk bottle (far left) -->
-        <rect x="32" y="82" width="16" height="28" rx="3" fill="white" stroke="#d3d1c7" stroke-width="1.5"/>
-        <rect x="34" y="76" width="12" height="10" rx="2" fill="white" stroke="#d3d1c7" stroke-width="1.5"/>
-        <rect x="36" y="74" width="8" height="5" rx="1" fill="#d3d1c7"/>
-        <path d="M34 95 Q40 92 46 95" stroke="#5a9e1a" stroke-width="1.5" fill="none"/>
+        <!-- Milk bottle (right) -->
+        <g stroke="var(--amber-display)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+          <path d="M262 20 L262 12 Q262 8 266 8 L280 8 Q284 8 284 12 L284 20 Q296 30 296 48 L296 110 Q296 124 282 126 L264 126 Q250 124 250 110 L250 48 Q250 30 262 20 Z"/>
+          <path d="M262 18 L284 18" stroke-width="2"/>
+        </g>
 
         <!-- Little stars/sparkles -->
-        <text x="118" y="58" font-size="14" text-anchor="middle" opacity="0.6">✦</text>
-        <text x="200" y="52" font-size="10" text-anchor="middle" opacity="0.4">✦</text>
-        <text x="145" y="48" font-size="8" text-anchor="middle" opacity="0.3">✦</text>
+        <text x="108" y="50" font-size="13" text-anchor="middle" opacity="0.5" fill="var(--olive)">✦</text>
+        <text x="232" y="40" font-size="9" text-anchor="middle" opacity="0.4" fill="var(--amber-display)">✦</text>
+        <text x="100" y="135" font-size="8" text-anchor="middle" opacity="0.3" fill="var(--amber-display)">✦</text>
       </svg>
 
-      <h1 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:28px;color:var(--amber-on-white);margin-bottom:6px;line-height:1.2">NE Vic<br>Run Sheet</h1>
+      <h1 style="font-family:'Poppins',sans-serif;font-weight:900;font-size:28px;letter-spacing:-0.3px;color:var(--amber-on-white);margin-bottom:6px;line-height:1.2">NE Vic<br>Run Sheet</h1>
       <p style="font-size:14px;color:var(--text-muted);margin-bottom:32px">Run sheet &amp; logistics</p>
-      <p style="font-size:10px;color:var(--text-muted);opacity:0.6;margin-top:-24px;margin-bottom:32px;letter-spacing:0.3px">Built by Adam &amp; Claude to tackle rural logistics 🌾</p>
+      <p style="font-size:10px;font-weight:700;color:var(--olive);opacity:0.7;margin-top:-24px;margin-bottom:32px;letter-spacing:0.6px;text-transform:uppercase">Built by Adam &amp; Claude to tackle rural logistics 🌾</p>
 
       <!-- Role cards -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:400px;margin:0 auto 12px">
