@@ -56,6 +56,7 @@
   .badge-ready { background: var(--green-light); color: var(--green); }
   .badge-collected { background: #E6F1FB; color: #185FA5; }
   .badge-flagged { background: var(--red-light); color: var(--red); }
+  .badge-carried { background: #EDEFE2; color: var(--olive); }
   .badge-delivered { background: var(--gray-light); color: var(--gray); }
 
   /* BUTTONS */
@@ -407,6 +408,9 @@
     <div class="run-date" id="hub-name-display" style="margin-bottom:4px"></div>
     <div class="run-meta" style="margin-bottom:16px" id="hub-run-meta"></div>
 
+    <!-- DRIVER COMPLETION STATUS -->
+    <div id="hub-driver-status"></div>
+
     <!-- HUB STATUS BAR -->
     <div class="hub-status-bar" id="hub-status-bar" style="display:none">
       <div class="hub-status-steps">
@@ -722,7 +726,7 @@ function itemRowAdmin(item) {
       '</div>' +
     '</div>' +
     '<div class="item-actions">' +
-      '<span class="badge badge-' + (item.status || 'pending') + '">' + (item.status || 'pending') + '</span>' +
+      '<span class="badge badge-' + (item.status || 'pending') + '">' + statusLabel(item.status) + '</span>' +
       '<button class="btn btn-sm" id="edit-btn-' + id + '" title="Edit notes">✏️</button>' +
       '<button class="btn btn-danger btn-sm" id="del-btn-' + id + '">✕</button>' +
     '</div>';
@@ -865,14 +869,16 @@ async function loadStatusOverview() {
   const nCollected = data.filter(i => i.status === 'collected').length;
   const nDelivered = data.filter(i => i.status === 'delivered').length;
   const nFlagged  = data.filter(i => i.status === 'flagged').length;
-  const nPending  = total - nCollected - nDelivered - nFlagged;
-  const pctDone   = Math.round(((nCollected + nDelivered) / total) * 100);
+  const nCarried  = data.filter(i => i.status === 'carried').length;
+  const nPending  = total - nCollected - nDelivered - nFlagged - nCarried;
+  const actionableTotal = total - nCarried; // carried items are rescheduled — no longer this week's business
+  const pctDone   = actionableTotal > 0 ? Math.round(((nCollected + nDelivered) / actionableTotal) * 100) : 100;
 
   const totalsHtml =
     '<div class="card" style="margin-bottom:16px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
         '<div style="font-size:15px;font-weight:600">Run progress</div>' +
-        '<div style="font-size:13px;color:var(--text-muted)">' + (nCollected + nDelivered) + ' of ' + total + ' items actioned</div>' +
+        '<div style="font-size:13px;color:var(--text-muted)">' + (nCollected + nDelivered) + ' of ' + actionableTotal + ' items actioned</div>' +
       '</div>' +
       '<div class="progress-bar" style="margin:0 0 12px"><div class="progress-fill" style="width:' + pctDone + '%"></div></div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -880,6 +886,7 @@ async function loadStatusOverview() {
         (nCollected? '<span class="badge badge-collected">' + nCollected + ' collected</span>' : '') +
         (nDelivered? '<span class="badge badge-delivered">' + nDelivered + ' delivered</span>' : '') +
         (nFlagged  ? '<span class="badge badge-flagged">'   + nFlagged   + ' flagged</span>'   : '') +
+        (nCarried  ? '<span class="badge badge-carried">↻ ' + nCarried   + ' carried</span>'   : '') +
       '</div>' +
     '</div>';
 
@@ -915,32 +922,34 @@ async function loadStatusOverview() {
 
   const driverCards = Object.entries(drivers).map(([driverName, items]) => {
     const dTotal     = items.length;
+    const dCarried   = items.filter(i => i.status === 'carried').length;
+    const dActionable= dTotal - dCarried; // carried items are rescheduled — exclude from "still to do"
     const dActioned  = items.filter(i => i.status === 'collected' || i.status === 'delivered').length;
     const dDelivered = items.filter(i => i.status === 'delivered').length;
     const dFlagged   = items.filter(i => i.status === 'flagged').length;
-    const dPct       = Math.round((dActioned / dTotal) * 100);
+    const dPct       = dActionable > 0 ? Math.round((dActioned / dActionable) * 100) : 100;
     const isCompleted = completedDrivers.has(driverName);
 
-    const statusDot = dActioned === 0
-      ? '<span style="color:var(--text-muted)">⬤</span>'
-      : dDelivered === dTotal
-        ? '<span style="color:var(--green)">⬤</span>'
+    const statusDot = isCompleted || (dActioned + dCarried) === dTotal
+      ? '<span style="color:var(--green)">⬤</span>'
+      : dActioned === 0
+        ? '<span style="color:var(--text-muted)">⬤</span>'
         : '<span style="color:var(--amber)">⬤</span>';
 
     const itemRows = items.map(item => {
       const s = item.status || 'pending';
-      const icon = s === 'delivered' ? '✓' : s === 'collected' ? '↑' : s === 'flagged' ? '⚑' : '·';
-      const fade = (s === 'delivered') ? 'opacity:0.5;' : '';
+      const icon = s === 'delivered' ? '✓' : s === 'collected' ? '↑' : s === 'flagged' ? '⚑' : s === 'carried' ? '↻' : '·';
+      const fade = (s === 'delivered' || s === 'carried') ? 'opacity:0.5;' : '';
       return '<div class="item-row" style="' + fade + 'padding:8px 0">' +
         '<div style="font-size:13px;font-weight:700;min-width:18px;color:' +
-          (s==='delivered'?'var(--green)':s==='collected'?'#185FA5':s==='flagged'?'var(--red)':'var(--text-muted)') +
+          (s==='delivered'?'var(--green)':s==='collected'?'#185FA5':s==='flagged'?'var(--red)':s==='carried'?'var(--olive)':'var(--text-muted)') +
         '">' + icon + '</div>' +
         '<div class="item-qty" style="font-size:14px">' + item.qty + '</div>' +
         '<div class="item-info">' +
           '<div class="item-name" style="font-size:14px">' + esc(item.description) + '</div>' +
           '<div class="item-route">' + esc(item.pickup_from) + ' <span class="arrow">→</span> <strong>' + esc(item.drop_to) + '</strong></div>' +
         '</div>' +
-        '<span class="badge badge-' + s + '">' + s + '</span>' +
+        '<span class="badge badge-' + s + '">' + statusLabel(s) + '</span>' +
       '</div>';
     }).join('');
 
@@ -954,8 +963,9 @@ async function loadStatusOverview() {
     return '<div class="card" style="margin-bottom:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
         '<div style="font-size:16px;font-weight:700">' + statusDot + ' 🚚 ' + esc(driverName) + '</div>' +
-        '<div style="font-size:13px;color:var(--text-muted)">' + dActioned + '/' + dTotal + ' · ' + dPct + '%' +
+        '<div style="font-size:13px;color:var(--text-muted)">' + dActioned + '/' + dActionable + ' · ' + dPct + '%' +
           (dFlagged ? ' · <span style="color:var(--red)">🚩 ' + dFlagged + '</span>' : '') +
+          (dCarried ? ' · <span style="color:var(--olive)">↻ ' + dCarried + '</span>' : '') +
         '</div>' +
       '</div>' +
       '<div class="progress-bar" style="margin:0 0 10px"><div class="progress-fill" style="width:' + dPct + '%"></div></div>' +
@@ -1056,6 +1066,13 @@ async function carryOverItems(run, driverFilter) {
 
   const { error } = await db.from('items').insert(rows);
   if (error) { console.error('Carry-over insert failed', error); toast('Carry-over failed — check console'); return 0; }
+
+  // Close out the originals so this week's run doesn't sit dangling at pending/flagged forever —
+  // without this, hub/admin "is everything done" checks would never resolve for this run.
+  const eligibleIds = eligible.map(i => i.id);
+  const { error: closeError } = await db.from('items').update({ status: 'carried' }).in('id', eligibleIds);
+  if (closeError) { console.error('Could not close out carried items', closeError); }
+
   return rows.length;
 }
 
@@ -1150,9 +1167,10 @@ async function loadDriverRun(driverName) {
     drops[i.drop_to].push(i);
   });
 
-  const collectedCount = items.filter(i => i.status === 'collected' || i.status === 'delivered').length;
-  const flaggedCount = items.filter(i => i.status === 'flagged').length;
-  updateDriverProgress(collectedCount, flaggedCount, items.length);
+  const actionableItems = items.filter(i => i.status !== 'carried');
+  const collectedCount = actionableItems.filter(i => i.status === 'collected' || i.status === 'delivered').length;
+  const flaggedCount = actionableItems.filter(i => i.status === 'flagged').length;
+  updateDriverProgress(collectedCount, flaggedCount, actionableItems.length);
 
   // Sort stop groups by their items' stop_order (lowest first; ungrouped/null goes last, original order preserved)
   const sortStops = (groups) => {
@@ -1352,7 +1370,9 @@ function driverItemRow(item, mode) {
 
   if (mode === 'pickup') {
     let actionBtn;
-    if (isFlagged) {
+    if (item.status === 'carried') {
+      actionBtn = '<span class="badge badge-carried" style="font-size:11px">↻ Carried to next week</span>';
+    } else if (isFlagged) {
       actionBtn = '<span class="badge badge-flagged" style="font-size:11px">Flagged — not collected</span>';
     } else if (isPickupDone) {
       actionBtn = '<button class="btn btn-sm" disabled style="cursor:default">✓ Collected</button>';
@@ -1361,7 +1381,7 @@ function driverItemRow(item, mode) {
     } else {
       actionBtn = '<button class="btn btn-success btn-sm mark-collected-btn" data-id="' + item.id + '">Confirm pickup</button>';
     }
-    return '<div class="item-row' + (isFlagged ? ' has-flag' : '') + '" style="' + ((isPickupDone || isFlagged) ? 'opacity:0.6' : '') + '">' +
+    return '<div class="item-row' + (isFlagged ? ' has-flag' : '') + '" style="' + ((isPickupDone || isFlagged || item.status === 'carried') ? 'opacity:0.6' : '') + '">' +
       flagCorner +
       '<div class="item-qty">' + item.qty + '</div>' +
       '<div class="item-info">' +
@@ -1375,7 +1395,9 @@ function driverItemRow(item, mode) {
     '</div>';
   } else {
     let actionBtn;
-    if (isFlagged) {
+    if (item.status === 'carried') {
+      actionBtn = '<span class="badge badge-carried" style="font-size:11px">↻ Carried to next week</span>';
+    } else if (isFlagged) {
       actionBtn = '<span class="badge badge-flagged" style="font-size:11px">Flagged — not delivered</span>';
     } else if (!isPickupDone) {
       actionBtn = '<span class="badge badge-pending" style="font-size:11px">Pick up first</span>';
@@ -1386,7 +1408,7 @@ function driverItemRow(item, mode) {
     } else {
       actionBtn = '<button class="btn btn-success btn-sm mark-delivered-btn" data-id="' + item.id + '">Confirm drop</button>';
     }
-    return '<div class="item-row' + (isFlagged ? ' has-flag' : '') + '" style="' + ((isDelivered || isFlagged) ? 'opacity:0.6' : '') + '">' +
+    return '<div class="item-row' + (isFlagged ? ' has-flag' : '') + '" style="' + ((isDelivered || isFlagged || item.status === 'carried') ? 'opacity:0.6' : '') + '">' +
       flagCorner +
       '<div class="item-qty">' + item.qty + '</div>' +
       '<div class="item-info">' +
@@ -1450,6 +1472,7 @@ async function loadHubView(hubName) {
   const run = runs && runs[0];
   if (!run) {
     document.getElementById('hub-run-meta').textContent = 'No upcoming run';
+    document.getElementById('hub-driver-status').innerHTML = '';
     document.getElementById('hub-inbound').innerHTML = '<div class="empty">No run scheduled</div>';
     document.getElementById('hub-outbound').innerHTML = '';
     return;
@@ -1460,6 +1483,12 @@ async function loadHubView(hubName) {
   const { data: inbound } = await db.from('items').select('*').eq('run_id', run.id).eq('drop_to', hubName).order('stop_order', { ascending: true, nullsFirst: false });
   // Outbound = pickup_from is this hub
   const { data: outbound } = await db.from('items').select('*').eq('run_id', run.id).eq('pickup_from', hubName).order('stop_order', { ascending: true, nullsFirst: false });
+
+  // --- DRIVER COMPLETION STATUS --- which driver(s) touch this hub, and have they finished their run?
+  const relevantDrivers = [...new Set([...(inbound || []), ...(outbound || [])].map(i => i.driver).filter(Boolean))];
+  const { data: completions } = await db.from('driver_completions').select('*').eq('run_id', run.id);
+  const completedSet = new Set((completions || []).map(c => c.driver));
+  document.getElementById('hub-driver-status').innerHTML = renderHubDriverStatus(relevantDrivers, completedSet);
 
   // Hub ready state
   const { data: readyData } = await db.from('hub_ready').select('*').eq('run_id', run.id).eq('hub_name', hubName).limit(1);
@@ -1480,7 +1509,7 @@ async function loadHubView(hubName) {
         : '';
       const statusBadge = isFlagged
         ? ''
-        : `<span class="badge badge-${item.status || 'pending'}">${item.status || 'pending'}</span>`;
+        : `<span class="badge badge-${item.status || 'pending'}">${statusLabel(item.status)}</span>`;
       return `
       <div class="item-row ${isFlagged ? 'hub-flag-tile has-flag' : ''}" ${isFlagged ? `data-id="${item.id}"` : ''} style="${isFlagged ? 'cursor:pointer' : ''}">
         ${flagCorner}
@@ -1500,6 +1529,25 @@ async function loadHubView(hubName) {
   document.getElementById('hub-outbound').innerHTML = renderItems(outbound, 'Nothing leaving from here today');
 }
 
+// Tells the hub coordinator whether the driver(s) relevant to their hub have wrapped up their run yet —
+// this was previously invisible on the hub side even though admin could already see it.
+function renderHubDriverStatus(relevantDrivers, completedSet) {
+  if (!relevantDrivers || relevantDrivers.length === 0) return '';
+  const doneDrivers = relevantDrivers.filter(d => completedSet.has(d));
+  const allDone = doneDrivers.length === relevantDrivers.length;
+
+  if (allDone) {
+    const names = relevantDrivers.join(' & ');
+    const verb = relevantDrivers.length > 1 ? 'runs are' : 'run is';
+    return `<div class="run-complete-banner">✓ ${esc(names)}'s ${verb} complete for this week</div>`;
+  }
+  if (doneDrivers.length > 0) {
+    const pendingDrivers = relevantDrivers.filter(d => !completedSet.has(d));
+    return `<div class="alert alert-info">✓ ${esc(doneDrivers.join(', '))} complete · still waiting on ${esc(pendingDrivers.join(', '))}</div>`;
+  }
+  return '';
+}
+
 function updateHubStatusBar(inbound, outbound) {
   const bar = document.getElementById('hub-status-bar');
   if (!inbound || inbound.length === 0) {
@@ -1508,43 +1556,55 @@ function updateHubStatusBar(inbound, outbound) {
   }
   bar.style.display = 'block';
 
-  // Step 0: all inbound items collected (status = collected or delivered)
-  const totalInbound = inbound.length;
-  const collectedCount = inbound.filter(i => i.status === 'collected' || i.status === 'delivered').length;
-  const allCollected = collectedCount === totalInbound;
+  // Carried items were rescheduled to next week — they're no longer this run's business
+  const actionable = inbound.filter(i => i.status !== 'carried');
+  const carriedCount = inbound.length - actionable.length;
 
-  // Step 1: driver en route = at least one collected but not yet all delivered to this hub
-  const deliveredCount = inbound.filter(i => i.status === 'delivered').length;
-  const allDelivered = deliveredCount === totalInbound;
-
-  // Step 2: all delivered
   const step0 = document.getElementById('hstep-0');
   const step1 = document.getElementById('hstep-1');
   const step2 = document.getElementById('hstep-2');
   const caption = document.getElementById('hub-status-caption');
-
-  // Reset
   [step0, step1, step2].forEach(s => { s.classList.remove('done', 'active'); });
   caption.className = 'hub-status-caption';
+
+  if (actionable.length === 0) {
+    // Everything inbound to this hub got carried to next week (e.g. driver completed with nothing collected)
+    step0.classList.add('done');
+    step1.classList.add('done');
+    step2.classList.add('done');
+    caption.textContent = `↻ All ${carriedCount} item${carriedCount !== 1 ? 's' : ''} for this hub were rescheduled to next week`;
+    return;
+  }
+
+  // Step 0: all inbound items collected (status = collected or delivered)
+  const totalInbound = actionable.length;
+  const collectedCount = actionable.filter(i => i.status === 'collected' || i.status === 'delivered').length;
+  const allCollected = collectedCount === totalInbound;
+
+  // Step 1: driver en route = at least one collected but not yet all delivered to this hub
+  const deliveredCount = actionable.filter(i => i.status === 'delivered').length;
+  const allDelivered = deliveredCount === totalInbound;
+
+  const carriedNote = carriedCount > 0 ? ` (${carriedCount} other item${carriedCount !== 1 ? 's' : ''} carried to next week)` : '';
 
   if (allDelivered) {
     step0.classList.add('done');
     step1.classList.add('done');
     step2.classList.add('done');
-    caption.textContent = '✓ All your items have been delivered';
+    caption.textContent = '✓ All your items have been delivered' + carriedNote;
     caption.className = 'hub-status-caption good';
   } else if (allCollected) {
     step0.classList.add('done');
     step1.classList.add('active');
     const remaining = totalInbound - deliveredCount;
-    caption.textContent = `Driver has collected everything — ${remaining} item${remaining !== 1 ? 's' : ''} heading your way`;
+    caption.textContent = `Driver has collected everything — ${remaining} item${remaining !== 1 ? 's' : ''} heading your way${carriedNote}`;
   } else if (collectedCount > 0) {
     step0.classList.add('active');
     const stillNeeded = totalInbound - collectedCount;
-    caption.textContent = `${collectedCount} of ${totalInbound} items collected — ${stillNeeded} still to be picked up`;
+    caption.textContent = `${collectedCount} of ${totalInbound} items collected — ${stillNeeded} still to be picked up${carriedNote}`;
   } else {
     step0.classList.add('active');
-    caption.textContent = `Waiting for driver to start collections (${totalInbound} item${totalInbound !== 1 ? 's' : ''} inbound)`;
+    caption.textContent = `Waiting for driver to start collections (${totalInbound} item${totalInbound !== 1 ? 's' : ''} inbound)${carriedNote}`;
   }
 }
 
@@ -1608,6 +1668,12 @@ function fmtDate(d) {
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Friendlier label for status badges — 'carried' reads better with the ↻ than bare text
+function statusLabel(status) {
+  const s = status || 'pending';
+  return s === 'carried' ? '↻ carried' : s;
 }
 
 // ---- WHATSAPP PARSER ----
