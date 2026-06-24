@@ -471,7 +471,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="app-version" style="position:fixed;bottom:6px;right:8px;z-index:50;font-size:10px;color:var(--text-muted);opacity:0.55;font-family:'Nunito',sans-serif;letter-spacing:0.2px;pointer-events:none">v0.65</div>
+<div id="app-version" style="position:fixed;bottom:6px;right:8px;z-index:50;font-size:10px;color:var(--text-muted);opacity:0.55;font-family:'Nunito',sans-serif;letter-spacing:0.2px;pointer-events:none">v0.70</div>
 
 <!-- NEW ITEM BANNER -->
 <div id="new-items-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:200;background:var(--brand);color:var(--amber-on-white);padding:12px 20px;text-align:center;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer" onclick="dismissBanner()">
@@ -663,32 +663,38 @@ function selectRun(id) {
   populateSelects();
 }
 
+function locationOptionsHtml(selected) {
+  const grouped = [
+    ['Hubs', HUBS],
+    ['Producers', PRODUCERS],
+    ['Drop points', DROP_POINTS]
+  ];
+  return '<option value="">— select —</option>' +
+    grouped.map(function(g) {
+      return '<optgroup label="' + g[0] + '">' +
+        g[1].map(function(l) {
+          return '<option value="' + esc(l) + '"' + (l === selected ? ' selected' : '') + '>' + esc(l) + '</option>';
+        }).join('') +
+        '</optgroup>';
+    }).join('');
+}
+
+function driverOptionsHtml(selected) {
+  return '<option value="">— select —</option>' +
+    DRIVERS.map(function(d) {
+      return '<option value="' + esc(d) + '"' + (d === selected ? ' selected' : '') + '>' + esc(d) + '</option>';
+    }).join('');
+}
+
 function populateSelects() {
   ['item-from', 'item-to'].forEach(function(id) {
     const sel = document.getElementById(id);
     if (!sel) return;
-    const cur = sel.value;
-    const grouped = [
-      ['Hubs', HUBS],
-      ['Producers', PRODUCERS],
-      ['Drop points', DROP_POINTS]
-    ];
-    sel.innerHTML = '<option value="">— select —</option>' +
-      grouped.map(function(g) {
-        return '<optgroup label="' + g[0] + '">' +
-          g[1].map(function(l) {
-            return '<option value="' + l + '"' + (l === cur ? ' selected' : '') + '>' + l + '</option>';
-          }).join('') +
-          '</optgroup>';
-      }).join('');
+    sel.innerHTML = locationOptionsHtml(sel.value);
   });
   const ds = document.getElementById('item-driver');
   if (!ds) return;
-  const dcur = ds.value;
-  ds.innerHTML = '<option value="">— select —</option>' +
-    DRIVERS.map(function(d) {
-      return '<option value="' + d + '"' + (d === dcur ? ' selected' : '') + '>' + d + '</option>';
-    }).join('');
+  ds.innerHTML = driverOptionsHtml(ds.value);
 }
 
 // ---- MANIFEST ----
@@ -728,14 +734,23 @@ function itemRowAdmin(item) {
       '<div class="item-route">' + esc(item.pickup_from) + ' <span class="arrow">→</span> <strong style="color:var(--text)">' + esc(item.drop_to) + '</strong>' +
         (item.notes ? ' <span style="margin-left:6px;color:var(--text-muted)">· ' + esc(item.notes) + '</span>' : '') +
       '</div>' +
-      '<div id="notes-edit-' + id + '" style="display:none;margin-top:6px">' +
-        '<input type="text" id="notes-input-' + id + '" value="' + esc(item.notes || '') + '" placeholder="Add a note for the driver..." style="margin-bottom:4px;font-size:13px" />' +
-        '<div style="display:flex;gap:6px" id="notes-btns-' + id + '"></div>' +
+      '<div id="item-edit-' + id + '" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--gray-border)">' +
+        '<div style="display:flex;gap:8px;margin-bottom:0">' +
+          '<input type="number" id="edit-qty-' + id + '" value="' + esc(item.qty) + '" min="1" style="width:80px" />' +
+          '<input type="text" id="edit-desc-' + id + '" value="' + esc(item.description) + '" placeholder="Description" style="flex:1" />' +
+        '</div>' +
+        '<div class="form-row" style="margin-bottom:0">' +
+          '<select id="edit-from-' + id + '">' + locationOptionsHtml(item.pickup_from) + '</select>' +
+          '<select id="edit-to-' + id + '">' + locationOptionsHtml(item.drop_to) + '</select>' +
+        '</div>' +
+        '<select id="edit-driver-' + id + '">' + driverOptionsHtml(item.driver) + '</select>' +
+        '<input type="text" id="edit-notes-' + id + '" value="' + esc(item.notes || '') + '" placeholder="Notes for the driver (optional)" />' +
+        '<div style="display:flex;gap:6px" id="edit-btns-' + id + '"></div>' +
       '</div>' +
     '</div>' +
     '<div class="item-actions">' +
       '<span class="badge badge-' + (item.status || 'pending') + '">' + statusLabel(item.status) + '</span>' +
-      '<button class="btn btn-sm" id="edit-btn-' + id + '" title="Edit notes">✏️</button>' +
+      '<button class="btn btn-sm" id="edit-btn-' + id + '" title="Edit item">✏️</button>' +
       '<button class="btn btn-danger btn-sm" id="del-btn-' + id + '">✕</button>' +
     '</div>';
 
@@ -743,20 +758,20 @@ function itemRowAdmin(item) {
   setTimeout(function() {
     const editBtn = document.getElementById('edit-btn-' + id);
     const delBtn = document.getElementById('del-btn-' + id);
-    const noteBtnsDiv = document.getElementById('notes-btns-' + id);
-    if (editBtn) editBtn.onclick = function() { editNotes(id); };
+    const editBtnsDiv = document.getElementById('edit-btns-' + id);
+    if (editBtn) editBtn.onclick = function() { editItem(id); };
     if (delBtn) delBtn.onclick = function() { deleteItem(id); };
-    if (noteBtnsDiv) {
+    if (editBtnsDiv) {
       const saveBtn = document.createElement('button');
       saveBtn.className = 'btn btn-primary btn-sm';
       saveBtn.textContent = 'Save';
-      saveBtn.onclick = function() { saveNotes(id); };
+      saveBtn.onclick = function() { saveItem(id); };
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'btn btn-sm';
       cancelBtn.textContent = 'Cancel';
-      cancelBtn.onclick = function() { cancelNotes(id); };
-      noteBtnsDiv.appendChild(saveBtn);
-      noteBtnsDiv.appendChild(cancelBtn);
+      cancelBtn.onclick = function() { cancelItemEdit(id); };
+      editBtnsDiv.appendChild(saveBtn);
+      editBtnsDiv.appendChild(cancelBtn);
     }
   }, 0);
 
@@ -764,21 +779,34 @@ function itemRowAdmin(item) {
 }
 
 
-function editNotes(itemId) {
-  document.getElementById('notes-edit-' + itemId).style.display = 'block';
-  document.getElementById('notes-input-' + itemId).focus();
+function editItem(itemId) {
+  document.getElementById('item-edit-' + itemId).style.display = 'block';
+  document.getElementById('edit-desc-' + itemId).focus();
 }
 
-function cancelNotes(itemId) {
-  document.getElementById('notes-edit-' + itemId).style.display = 'none';
+function cancelItemEdit(itemId) {
+  document.getElementById('item-edit-' + itemId).style.display = 'none';
 }
 
-async function saveNotes(itemId) {
-  const val = document.getElementById('notes-input-' + itemId).value.trim();
-  const { error } = await db.from('items').update({ notes: val }).eq('id', itemId);
-  if (error) { toast('Could not save note'); return; }
-  toast('Note saved ✓');
+async function saveItem(itemId) {
+  const desc = document.getElementById('edit-desc-' + itemId).value.trim();
+  const qty = parseInt(document.getElementById('edit-qty-' + itemId).value) || 1;
+  const from = document.getElementById('edit-from-' + itemId).value;
+  const to = document.getElementById('edit-to-' + itemId).value;
+  const driver = document.getElementById('edit-driver-' + itemId).value;
+  const notes = document.getElementById('edit-notes-' + itemId).value.trim();
+  if (!desc) { toast('Add a description'); return; }
+  if (!from) { toast('Select pickup location'); return; }
+  if (!to) { toast('Select drop location'); return; }
+  if (!driver) { toast('Assign a driver'); return; }
+
+  const { error } = await db.from('items').update({
+    description: desc, qty: qty, pickup_from: from, drop_to: to, driver: driver, notes: notes
+  }).eq('id', itemId);
+  if (error) { toast('Could not save changes'); console.error(error); return; }
+  toast('Item updated ✓');
   loadManifest();
+  loadStatusOverview();
 }
 
 async function addItem() {
@@ -1725,6 +1753,7 @@ function statusLabel(status) {
 
 // ---- WHATSAPP PARSER ----
 let parsedItems = [];
+let editingParsedIndex = null;
 
 async function parseWhatsApp() {
   if (!currentRunId) { toast('Select a run first'); return; }
@@ -1786,11 +1815,9 @@ ${text}`;
       })
     });
     const data = await response.json();
-    console.log('API response:', JSON.stringify(data));
     if (data.error) throw new Error('API error: ' + data.error.message);
     const raw = data.content && data.content[0] && data.content[0].text;
     if (!raw) throw new Error('No content in response — check API key and model name');
-    console.log('Raw text:', raw);
 
     let clean = raw.replace(/```json|```/gi, '').trim();
     const start = clean.indexOf('[');
@@ -1802,7 +1829,7 @@ ${text}`;
     } catch(jsonErr) {
       // Last resort: use Function to evaluate (handles minor issues)
       console.warn('Strict JSON failed, trying eval approach:', jsonErr.message);
-      console.log('Problematic JSON:', clean);
+      console.warn('Problematic JSON:', clean);
       throw new Error('JSON still invalid after cleanup: ' + jsonErr.message + ' — check console for details');
     }
 
@@ -1820,7 +1847,28 @@ ${text}`;
 
 function renderParsedItems() {
   const list = document.getElementById('parsed-items-list');
-  list.innerHTML = parsedItems.map((item, i) => `
+  list.innerHTML = parsedItems.map((item, i) => {
+    if (i === editingParsedIndex) {
+      return `
+      <div class="card" style="margin-bottom:10px;padding:14px" id="parsed-${i}">
+        <div style="display:flex;gap:8px;margin-bottom:0">
+          <input type="number" id="parsed-edit-qty-${i}" value="${esc(item.qty)}" min="1" style="width:80px" />
+          <input type="text" id="parsed-edit-desc-${i}" value="${esc(item.description)}" placeholder="Description" style="flex:1" />
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <select id="parsed-edit-from-${i}">${locationOptionsHtml(item.pickup_from)}</select>
+          <select id="parsed-edit-to-${i}">${locationOptionsHtml(item.drop_to)}</select>
+        </div>
+        <select id="parsed-edit-driver-${i}">${driverOptionsHtml(item.driver)}</select>
+        <input type="text" id="parsed-edit-notes-${i}" value="${esc(item.notes || '')}" placeholder="Notes (optional)" />
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" onclick="saveParsedItem(${i})">Save</button>
+          <button class="btn btn-sm" onclick="cancelParsedEdit()">Cancel</button>
+        </div>
+      </div>
+    `;
+    }
+    return `
     <div class="card" style="margin-bottom:10px;padding:14px" id="parsed-${i}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div style="flex:1">
@@ -1835,14 +1883,46 @@ function renderParsedItems() {
             ${item.notes ? '<span style="color:var(--amber)">⚠ ' + esc(item.notes) + '</span>' : ''}
           </div>
         </div>
-        <button class="btn btn-danger btn-sm" onclick="removeParsedItem(${i})" style="flex-shrink:0">✕</button>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-sm" onclick="editParsedItem(${i})" title="Edit item">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="removeParsedItem(${i})">✕</button>
+        </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function editParsedItem(i) {
+  editingParsedIndex = i;
+  renderParsedItems();
+}
+
+function cancelParsedEdit() {
+  editingParsedIndex = null;
+  renderParsedItems();
+}
+
+function saveParsedItem(i) {
+  const desc = document.getElementById('parsed-edit-desc-' + i).value.trim();
+  const qty = parseInt(document.getElementById('parsed-edit-qty-' + i).value) || 1;
+  const from = document.getElementById('parsed-edit-from-' + i).value;
+  const to = document.getElementById('parsed-edit-to-' + i).value;
+  const driver = document.getElementById('parsed-edit-driver-' + i).value;
+  const notes = document.getElementById('parsed-edit-notes-' + i).value.trim();
+  if (!desc) { toast('Add a description'); return; }
+  if (!from) { toast('Select pickup location'); return; }
+  if (!to) { toast('Select drop location'); return; }
+  if (!driver) { toast('Assign a driver'); return; }
+
+  parsedItems[i] = { description: desc, qty: qty, pickup_from: from, drop_to: to, driver: driver, notes: notes };
+  editingParsedIndex = null;
+  renderParsedItems();
 }
 
 function removeParsedItem(i) {
   parsedItems.splice(i, 1);
+  if (editingParsedIndex === i) editingParsedIndex = null;
   if (parsedItems.length === 0) {
     document.getElementById('parsed-results').style.display = 'none';
   } else {
