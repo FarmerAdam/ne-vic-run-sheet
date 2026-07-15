@@ -388,6 +388,20 @@
           </select>
         </div>
       </div>
+      <label>Address (optional)</label>
+      <input type="text" id="loc-new-address" placeholder="e.g. 123 Great Alpine Rd, Bright VIC" />
+      <div class="form-row">
+        <div>
+          <label>Contact name (optional)</label>
+          <input type="text" id="loc-new-contact" placeholder="e.g. Sarah" />
+        </div>
+        <div>
+          <label>Phone (optional)</label>
+          <input type="text" id="loc-new-phone" placeholder="e.g. 0400 000 000" />
+        </div>
+      </div>
+      <label>Access notes (optional)</label>
+      <input type="text" id="loc-new-notes" placeholder="e.g. Gate code 1234, deliver to side door" />
       <button class="btn btn-primary" onclick="addLocation()">Add location</button>
     </div>
 
@@ -495,7 +509,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="app-version" style="position:fixed;bottom:6px;right:8px;z-index:50;font-size:10px;color:var(--text-muted);opacity:0.55;font-family:'Nunito',sans-serif;letter-spacing:0.2px;pointer-events:none">v0.72</div>
+<div id="app-version" style="position:fixed;bottom:6px;right:8px;z-index:50;font-size:10px;color:var(--text-muted);opacity:0.55;font-family:'Nunito',sans-serif;letter-spacing:0.2px;pointer-events:none">v0.73</div>
 
 <!-- NEW ITEM BANNER -->
 <div id="new-items-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:200;background:var(--brand);color:var(--amber-on-white);padding:12px 20px;text-align:center;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer" onclick="dismissBanner()">
@@ -603,6 +617,7 @@ let HUBS = [];
 let PRODUCERS = [];
 let DROP_POINTS = [];
 let ALL_KNOWN_LOCATIONS = [];
+let locationDetailsMap = {}; // name -> full location row (address, contact_name, phone, notes)
 
 async function loadLocations() {
   const { data, error } = await db.from('locations').select('*').order('sort_order', { ascending: true, nullsFirst: false }).order('name');
@@ -616,6 +631,34 @@ async function loadLocations() {
   PRODUCERS = active.filter(l => l.type === 'producer').map(l => l.name);
   DROP_POINTS = active.filter(l => l.type === 'drop_point').map(l => l.name);
   ALL_KNOWN_LOCATIONS = [...HUBS, ...PRODUCERS, ...DROP_POINTS];
+
+  locationDetailsMap = {};
+  allLocationsRaw.forEach(l => { locationDetailsMap[l.name] = l; });
+}
+
+// Renders a small block of address / phone / access-notes for a stop, used on the Driver view
+// so a driver can navigate and call ahead without leaving the app. Returns '' if nothing is set.
+function stopDetailsHtml(locationName) {
+  const loc = locationDetailsMap[locationName];
+  if (!loc) return '';
+  const bits = [];
+  if (loc.address) {
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(loc.address);
+    bits.push('<a href="' + mapsUrl + '" target="_blank" rel="noopener" style="color:var(--text);text-decoration:underline">📍 ' + esc(loc.address) + '</a>');
+  }
+  if (loc.phone) {
+    bits.push('<a href="tel:' + esc(loc.phone.replace(/\s+/g, '')) + '" style="color:var(--text);text-decoration:underline">☎ ' + esc(loc.phone) + (loc.contact_name ? ' (' + esc(loc.contact_name) + ')' : '') + '</a>');
+  } else if (loc.contact_name) {
+    bits.push('👤 ' + esc(loc.contact_name));
+  }
+  let html = '';
+  if (bits.length > 0) {
+    html += '<div class="stop-time" style="margin-top:-6px;display:flex;gap:12px;flex-wrap:wrap">' + bits.join('') + '</div>';
+  }
+  if (loc.notes) {
+    html += '<div class="item-route" style="color:var(--amber);margin-bottom:8px">⚠ ' + esc(loc.notes) + '</div>';
+  }
+  return html;
 }
 
 const DRIVERS = ['Bright Loop', 'SKVFH & A&A Loop'];
@@ -1381,6 +1424,7 @@ async function loadDriverRun(driverName) {
       ${currentDriverIsLocked ? '' : '<div class="stop-drag-handle"><span class="grip">⠿⠿</span> Drag to reorder</div>'}
       <div class="stop-name">📍 ${esc(loc)}</div>
       <div class="stop-time">Pick up ${locItems.length} item${locItems.length !== 1 ? 's' : ''}</div>
+      ${stopDetailsHtml(loc)}
       ${locItems.map(item => driverItemRow(item, 'pickup')).join('')}
     </div>`;
   });
@@ -1391,6 +1435,7 @@ async function loadDriverRun(driverName) {
       ${currentDriverIsLocked ? '' : '<div class="stop-drag-handle"><span class="grip">⠿⠿</span> Drag to reorder</div>'}
       <div class="stop-name">🎯 ${esc(loc)}</div>
       <div class="stop-time">Drop off ${locItems.length} item${locItems.length !== 1 ? 's' : ''}</div>
+      ${stopDetailsHtml(loc)}
       ${locItems.map(item => driverItemRow(item, 'drop')).join('')}
     </div>`;
   });
@@ -1854,12 +1899,35 @@ function renderLocationsTab() {
 function locationRowHtml(loc) {
   const id = loc.id;
   const inactive = !loc.active;
+
+  // Secondary line under the name showing whatever details are on file
+  const detailBits = [];
+  if (loc.address) detailBits.push('📍 ' + esc(loc.address));
+  if (loc.phone) detailBits.push('☎ ' + esc(loc.phone));
+  if (loc.contact_name) detailBits.push('👤 ' + esc(loc.contact_name));
+  const detailLine = detailBits.length > 0
+    ? '<div class="item-route">' + detailBits.join(' · ') + '</div>'
+    : '<div class="item-route" style="color:var(--text-muted);font-style:italic">No address/contact on file</div>';
+  const notesLine = loc.notes
+    ? '<div class="item-route" style="color:var(--amber)">⚠ ' + esc(loc.notes) + '</div>'
+    : '';
+
   return '<div class="item-row" style="' + (inactive ? 'opacity:0.5' : '') + '" id="loc-row-' + id + '">' +
     '<div class="item-info">' +
       '<div class="item-name">' + esc(loc.name) + (inactive ? ' <span class="badge badge-carried" style="margin-left:6px">inactive</span>' : '') + '</div>' +
+      detailLine + notesLine +
       '<div id="loc-edit-' + id + '" style="display:none;margin-top:8px">' +
+        '<label>Name</label>' +
         '<input type="text" id="loc-edit-name-' + id + '" value="' + esc(loc.name) + '" />' +
         '<div class="alert alert-warning" style="padding:8px 10px;font-size:12px;margin-bottom:8px">Renaming won\'t update items already on a current or upcoming run — those keep the old name until carried over next week.</div>' +
+        '<label>Address</label>' +
+        '<input type="text" id="loc-edit-address-' + id + '" value="' + esc(loc.address || '') + '" placeholder="e.g. 123 Great Alpine Rd, Bright VIC" />' +
+        '<div class="form-row" style="margin-bottom:0">' +
+          '<div><label>Contact name</label><input type="text" id="loc-edit-contact-' + id + '" value="' + esc(loc.contact_name || '') + '" /></div>' +
+          '<div><label>Phone</label><input type="text" id="loc-edit-phone-' + id + '" value="' + esc(loc.phone || '') + '" /></div>' +
+        '</div>' +
+        '<label>Access notes</label>' +
+        '<input type="text" id="loc-edit-notes-' + id + '" value="' + esc(loc.notes || '') + '" placeholder="e.g. Gate code 1234, deliver to side door" />' +
         '<div style="display:flex;gap:6px">' +
           '<button class="btn btn-primary btn-sm" onclick="saveLocation(\'' + id + '\')">Save</button>' +
           '<button class="btn btn-sm" onclick="cancelLocationEdit(\'' + id + '\')">Cancel</button>' +
@@ -1867,7 +1935,7 @@ function locationRowHtml(loc) {
       '</div>' +
     '</div>' +
     '<div class="item-actions">' +
-      '<button class="btn btn-sm" onclick="editLocation(\'' + id + '\')" title="Rename">✏️</button>' +
+      '<button class="btn btn-sm" onclick="editLocation(\'' + id + '\')" title="Edit details">✏️</button>' +
       '<button class="btn btn-sm" onclick="toggleLocationActive(\'' + id + '\',' + loc.active + ')">' + (inactive ? 'Reactivate' : 'Deactivate') + '</button>' +
     '</div>' +
   '</div>';
@@ -1886,14 +1954,25 @@ function cancelLocationEdit(id) {
 async function addLocation() {
   const name = document.getElementById('loc-new-name').value.trim();
   const type = document.getElementById('loc-new-type').value;
+  const address = document.getElementById('loc-new-address').value.trim();
+  const contact_name = document.getElementById('loc-new-contact').value.trim();
+  const phone = document.getElementById('loc-new-phone').value.trim();
+  const notes = document.getElementById('loc-new-notes').value.trim();
   if (!name) { toast('Enter a name'); return; }
   const dup = allLocationsRaw.find(function(l) { return l.name.toLowerCase() === name.toLowerCase(); });
   if (dup) { toast('A location with that name already exists'); return; }
   const sameType = allLocationsRaw.filter(function(l) { return l.type === type; });
   const maxOrder = sameType.reduce(function(m, l) { return Math.max(m, l.sort_order || 0); }, 0);
-  const { error } = await db.from('locations').insert({ name: name, type: type, active: true, sort_order: maxOrder + 10 });
+  const { error } = await db.from('locations').insert({
+    name: name, type: type, active: true, sort_order: maxOrder + 10,
+    address: address || null, contact_name: contact_name || null, phone: phone || null, notes: notes || null
+  });
   if (error) { toast('Could not add location — check console'); console.error(error); return; }
   document.getElementById('loc-new-name').value = '';
+  document.getElementById('loc-new-address').value = '';
+  document.getElementById('loc-new-contact').value = '';
+  document.getElementById('loc-new-phone').value = '';
+  document.getElementById('loc-new-notes').value = '';
   toast('Location added ✓');
   await loadLocations();
   renderLocationsTab();
@@ -1901,12 +1980,17 @@ async function addLocation() {
 }
 
 async function saveLocation(id) {
-  const nameInput = document.getElementById('loc-edit-name-' + id);
-  const name = nameInput.value.trim();
+  const name = document.getElementById('loc-edit-name-' + id).value.trim();
+  const address = document.getElementById('loc-edit-address-' + id).value.trim();
+  const contact_name = document.getElementById('loc-edit-contact-' + id).value.trim();
+  const phone = document.getElementById('loc-edit-phone-' + id).value.trim();
+  const notes = document.getElementById('loc-edit-notes-' + id).value.trim();
   if (!name) { toast('Enter a name'); return; }
-  const { error } = await db.from('locations').update({ name: name }).eq('id', id);
-  if (error) { toast('Could not rename — check console'); console.error(error); return; }
-  toast('Location renamed ✓');
+  const { error } = await db.from('locations').update({
+    name: name, address: address || null, contact_name: contact_name || null, phone: phone || null, notes: notes || null
+  }).eq('id', id);
+  if (error) { toast('Could not save — check console'); console.error(error); return; }
+  toast('Location updated ✓');
   await loadLocations();
   renderLocationsTab();
   populateSelects();
