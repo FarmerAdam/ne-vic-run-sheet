@@ -412,7 +412,7 @@
     <div id="locations-list"><div class="loading">Loading locations...</div></div>
 
     <div class="section-label" style="margin-top:28px">Learned driver routes</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">This is the stop order the app has learned for each driver. It updates automatically whenever a driver drags their stops into a new order on their run, and it carries forward to next week's run — new stops get added to the end until reordered.</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">The app learns a separate order for a driver's pickups and their drops — reordering one never affects the other, even for a location that's both (e.g. picking up bread there and dropping empty crates back later). Updates automatically whenever a driver drags their stops, and carries forward to next week's run.</p>
     <div id="route-positions-panel"><div class="loading">Loading routes...</div></div>
   </div>
 </div>
@@ -513,7 +513,7 @@
 
 <div class="toast" id="toast"></div>
 
-<div id="app-version" style="position:fixed;bottom:6px;right:8px;z-index:50;font-size:10px;color:var(--text-muted);opacity:0.55;font-family:'Nunito',sans-serif;letter-spacing:0.2px;pointer-events:none">v0.75</div>
+<div id="app-version" style="position:fixed;bottom:6px;right:8px;z-index:50;font-size:10px;color:var(--text-muted);opacity:0.55;font-family:'Nunito',sans-serif;letter-spacing:0.2px;pointer-events:none">v0.76</div>
 
 <!-- NEW ITEM BANNER -->
 <div id="new-items-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:200;background:var(--brand);color:var(--amber-on-white);padding:12px 20px;text-align:center;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer" onclick="dismissBanner()">
@@ -759,31 +759,38 @@ function populateSelects() {
 }
 
 // ---- ROUTE LEARNING ----
-// Persists a per-driver, per-location "route position" so a driver's stop
-// order carries forward automatically week to week, instead of resetting
+// Persists a per-driver, per-location, per-role "route position" so a driver's
+// stop order carries forward automatically week to week, instead of resetting
 // every time a new run is created. New stops are appended to the end of the
 // learned route the first time they appear; dragging stops on the Driver
 // view updates the learned order for good (not just for that week's run).
-let routePositionCache = {}; // key: driver + '||' + location -> position
+//
+// IMPORTANT: pickup order and drop order are tracked as two independent
+// sequences (stopType 'pickup' vs 'drop'). A location can be both a pickup
+// point and a drop point for the same driver (e.g. collecting bread from a
+// bakery, then returning empty crates there later) and those two roles have
+// nothing to do with each other — reordering one must never touch the other.
+let routePositionCache = {}; // key: driver + '||' + location + '||' + stopType -> position
 
-function routeCacheKey(driver, location) { return driver + '||' + location; }
+function routeCacheKey(driver, location, stopType) { return driver + '||' + location + '||' + stopType; }
 
-async function resolveStopOrder(driver, locationName) {
+async function resolveStopOrder(driver, locationName, stopType) {
   if (!driver || !locationName) return null;
-  const key = routeCacheKey(driver, locationName);
+  const key = routeCacheKey(driver, locationName, stopType);
   if (routePositionCache[key] != null) return routePositionCache[key];
 
-  const { data: existing } = await db.from('route_positions').select('*').eq('driver', driver).eq('location_name', locationName).limit(1);
+  const { data: existing } = await db.from('route_positions').select('*').eq('driver', driver).eq('location_name', locationName).eq('stop_type', stopType).limit(1);
   if (existing && existing[0]) {
     routePositionCache[key] = existing[0].position;
     return existing[0].position;
   }
 
-  // First time this driver has had this stop — learn it by appending to the end of their known route
-  const { data: maxRow } = await db.from('route_positions').select('position').eq('driver', driver).order('position', { ascending: false }).limit(1);
+  // First time this driver has had this stop in this role — learn it by appending
+  // to the end of their known route for that role (pickup and drop sequences grow independently)
+  const { data: maxRow } = await db.from('route_positions').select('position').eq('driver', driver).eq('stop_type', stopType).order('position', { ascending: false }).limit(1);
   const nextPos = (maxRow && maxRow[0] ? maxRow[0].position : 0) + 10;
 
-  const { error } = await db.from('route_positions').insert({ driver, location_name: locationName, position: nextPos });
+  const { error } = await db.from('route_positions').insert({ driver, location_name: locationName, stop_type: stopType, position: nextPos });
   if (error) {
     console.error('Could not save learned route position', error);
     return nextPos; // still usable for this run even if it didn't save
@@ -792,8 +799,8 @@ async function resolveStopOrder(driver, locationName) {
   return nextPos;
 }
 
-async function loadRoutePositionsForDriver(driver) {
-  const { data } = await db.from('route_positions').select('*').eq('driver', driver).order('position', { ascending: true });
+async function loadRoutePositionsForDriver(driver, stopType) {
+  const { data } = await db.from('route_positions').select('*').eq('driver', driver).eq('stop_type', stopType).order('position', { ascending: true });
   return data || [];
 }
 
@@ -802,48 +809,54 @@ async function renderRoutePositionsPanel() {
   if (!el) return;
   let html = '';
   for (const driver of DRIVERS) {
-    const rows = await loadRoutePositionsForDriver(driver);
     html += '<div class="card" style="margin-bottom:12px">' +
-      '<div class="card-title">🧭 ' + esc(driver) + ' <span class="sub">learned route order</span></div>';
-    if (rows.length === 0) {
-      html += '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">No route learned yet — it builds automatically as items are added and this driver reorders their stops.</div>';
-    } else {
-      html += rows.map((r, i) => (
-        '<div class="item-row" style="padding:8px 0">' +
-          '<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">' +
-            '<button class="btn btn-sm" style="padding:2px 8px" ' + (i === 0 ? 'disabled' : '') + ' onclick="moveRoutePosition(\'' + esc(driver) + '\',\'' + r.id + '\',-1)">▲</button>' +
-            '<button class="btn btn-sm" style="padding:2px 8px" ' + (i === rows.length - 1 ? 'disabled' : '') + ' onclick="moveRoutePosition(\'' + esc(driver) + '\',\'' + r.id + '\',1)">▼</button>' +
-          '</div>' +
-          '<div class="item-info"><div class="item-name">' + (i + 1) + '. ' + esc(r.location_name) + '</div></div>' +
-          '<button class="btn btn-danger btn-sm" onclick="forgetRoutePosition(\'' + r.id + '\',\'' + esc(driver) + '\')">Forget</button>' +
-        '</div>'
-      )).join('');
-    }
-    html += '</div>';
+      '<div class="card-title">🧭 ' + esc(driver) + '</div>' +
+      '<div class="form-row" style="align-items:flex-start">' +
+        '<div><div class="section-label" style="margin-top:0">📦 Pickup order</div>' + await routeListHtml(driver, 'pickup') + '</div>' +
+        '<div><div class="section-label" style="margin-top:0">🎯 Drop order</div>' + await routeListHtml(driver, 'drop') + '</div>' +
+      '</div>' +
+    '</div>';
   }
   el.innerHTML = html;
 }
 
-async function moveRoutePosition(driver, id, direction) {
-  const rows = await loadRoutePositionsForDriver(driver);
+async function routeListHtml(driver, stopType) {
+  const rows = await loadRoutePositionsForDriver(driver, stopType);
+  if (rows.length === 0) {
+    return '<div style="font-size:13px;color:var(--text-muted);padding:8px 0">Nothing learned yet — builds automatically as items are added and this driver reorders their stops.</div>';
+  }
+  return rows.map((r, i) => (
+    '<div class="item-row" style="padding:6px 0">' +
+      '<div style="display:flex;flex-direction:column;gap:2px;margin-right:4px">' +
+        '<button class="btn btn-sm" style="padding:2px 8px" ' + (i === 0 ? 'disabled' : '') + ' onclick="moveRoutePosition(\'' + esc(driver) + '\',\'' + stopType + '\',\'' + r.id + '\',-1)">▲</button>' +
+        '<button class="btn btn-sm" style="padding:2px 8px" ' + (i === rows.length - 1 ? 'disabled' : '') + ' onclick="moveRoutePosition(\'' + esc(driver) + '\',\'' + stopType + '\',\'' + r.id + '\',1)">▼</button>' +
+      '</div>' +
+      '<div class="item-info"><div class="item-name" style="font-size:14px">' + (i + 1) + '. ' + esc(r.location_name) + '</div></div>' +
+      '<button class="btn btn-danger btn-sm" onclick="forgetRoutePosition(\'' + r.id + '\',\'' + esc(driver) + '\',\'' + stopType + '\')">Forget</button>' +
+    '</div>'
+  )).join('');
+}
+
+async function moveRoutePosition(driver, stopType, id, direction) {
+  const rows = await loadRoutePositionsForDriver(driver, stopType);
   const idx = rows.findIndex(r => r.id === id);
   const swapIdx = idx + direction;
   if (idx === -1 || swapIdx < 0 || swapIdx >= rows.length) return;
   const a = rows[idx], b = rows[swapIdx];
   await db.from('route_positions').update({ position: b.position }).eq('id', a.id);
   await db.from('route_positions').update({ position: a.position }).eq('id', b.id);
-  routePositionCache[routeCacheKey(driver, a.location_name)] = b.position;
-  routePositionCache[routeCacheKey(driver, b.location_name)] = a.position;
+  routePositionCache[routeCacheKey(driver, a.location_name, stopType)] = b.position;
+  routePositionCache[routeCacheKey(driver, b.location_name, stopType)] = a.position;
   renderRoutePositionsPanel();
   toast('Route order updated ✓');
 }
 
-async function forgetRoutePosition(id, driver) {
+async function forgetRoutePosition(id, driver, stopType) {
   if (!confirm('Forget this stop\'s learned position? It will re-learn a position (appended to the end) next time it appears on a run.')) return;
   const { data } = await db.from('route_positions').select('*').eq('id', id).limit(1);
   const row = data && data[0];
   await db.from('route_positions').delete().eq('id', id);
-  if (row) delete routePositionCache[routeCacheKey(driver, row.location_name)];
+  if (row) delete routePositionCache[routeCacheKey(driver, row.location_name, stopType)];
   renderRoutePositionsPanel();
   toast('Forgotten — will relearn next time');
 }
@@ -951,10 +964,12 @@ async function saveItem(itemId) {
   if (!to) { toast('Select drop location'); return; }
   if (!driver) { toast('Assign a driver'); return; }
 
-  const stopOrder = await resolveStopOrder(driver, from);
+  const pickupOrder = await resolveStopOrder(driver, from, 'pickup');
+  const dropOrder = await resolveStopOrder(driver, to, 'drop');
 
   const { error } = await db.from('items').update({
-    description: desc, qty: qty, pickup_from: from, drop_to: to, driver: driver, notes: notes, stop_order: stopOrder
+    description: desc, qty: qty, pickup_from: from, drop_to: to, driver: driver, notes: notes,
+    pickup_stop_order: pickupOrder, drop_stop_order: dropOrder
   }).eq('id', itemId);
   if (error) { toast('Could not save changes'); console.error(error); return; }
   toast('Item updated ✓');
@@ -989,7 +1004,8 @@ async function addItem() {
     }
   }
 
-  const stopOrder = await resolveStopOrder(driver, from);
+  const pickupOrder = await resolveStopOrder(driver, from, 'pickup');
+  const dropOrder = await resolveStopOrder(driver, to, 'drop');
 
   const { error } = await db.from('items').insert({
     run_id: currentRunId,
@@ -1000,7 +1016,8 @@ async function addItem() {
     driver: driver,
     notes: notes,
     status: 'pending',
-    stop_order: stopOrder
+    pickup_stop_order: pickupOrder,
+    drop_stop_order: dropOrder
   });
   if (error) { toast('Error saving item'); console.error(error); return; }
   toast('Added: ' + qty + 'x ' + desc + ' → ' + to);
@@ -1285,7 +1302,8 @@ async function carryOverItems(run, driverFilter) {
   const carryNote = '↻ Carried from ' + fmtDate(run.run_date);
   const rows = [];
   for (const item of eligible) {
-    const stopOrder = await resolveStopOrder(item.driver, item.pickup_from);
+    const pickupOrder = await resolveStopOrder(item.driver, item.pickup_from, 'pickup');
+    const dropOrder = await resolveStopOrder(item.driver, item.drop_to, 'drop');
     rows.push({
       run_id: nextRun.id,
       description: item.description,
@@ -1296,7 +1314,8 @@ async function carryOverItems(run, driverFilter) {
       notes: item.notes ? (item.notes + ' · ' + carryNote) : carryNote,
       status: 'pending',
       carried_from_item_id: item.id,
-      stop_order: stopOrder
+      pickup_stop_order: pickupOrder,
+      drop_stop_order: dropOrder
     });
   }
 
@@ -1384,7 +1403,7 @@ async function loadDriverRun(driverName) {
 
   currentDriverIsLocked = await isDriverCompleted(run.id, driverName);
 
-  const { data: items } = await db.from('items').select('*').eq('run_id', run.id).eq('driver', driverName).order('stop_order', { ascending: true, nullsFirst: false }).order('created_at');
+  const { data: items } = await db.from('items').select('*').eq('run_id', run.id).eq('driver', driverName).order('created_at');
   if (!items || items.length === 0) {
     document.getElementById('driver-stops').innerHTML = '<div class="empty">No items assigned to you for this run</div>';
     document.getElementById('driver-complete-banner').innerHTML = '';
@@ -1393,7 +1412,7 @@ async function loadDriverRun(driverName) {
     return;
   }
 
-  // Group by pickup location (stops), preserving stop_order
+  // Group by pickup location and by drop location — every item belongs to one of each
   const pickups = {};
   const drops = {};
   items.forEach(i => {
@@ -1408,11 +1427,13 @@ async function loadDriverRun(driverName) {
   const flaggedCount = actionableItems.filter(i => i.status === 'flagged').length;
   updateDriverProgress(collectedCount, flaggedCount, actionableItems.length);
 
-  // Sort stop groups by their items' stop_order (lowest first; ungrouped/null goes last, original order preserved)
-  const sortStops = (groups) => {
+  // Sort stop groups by the given order field (lowest first; ungrouped/null goes last, original order preserved).
+  // Pickups and Drops are sorted by their own independent field (pickup_stop_order / drop_stop_order) so
+  // reordering one section can never shuffle the other, even for a location that plays both roles.
+  const sortStopsBy = (groups, field) => {
     return Object.entries(groups).sort((a, b) => {
-      const aOrder = a[1][0].stop_order;
-      const bOrder = b[1][0].stop_order;
+      const aOrder = a[1][0][field];
+      const bOrder = b[1][0][field];
       if (aOrder == null && bOrder == null) return 0;
       if (aOrder == null) return 1;
       if (bOrder == null) return -1;
@@ -1423,7 +1444,7 @@ async function loadDriverRun(driverName) {
   let html = '';
   // PICKUPS section
   html += `<div class="section-label">Pickups</div>`;
-  sortStops(pickups).forEach(([loc, locItems]) => {
+  sortStopsBy(pickups, 'pickup_stop_order').forEach(([loc, locItems]) => {
     html += `<div class="card stop-card stop-pickup" draggable="${!currentDriverIsLocked}" data-stop-group="pickup" data-stop-loc="${esc(loc)}">
       ${currentDriverIsLocked ? '' : '<div class="stop-drag-handle"><span class="grip">⠿⠿</span> Drag to reorder</div>'}
       <div class="stop-name">📍 ${esc(loc)}</div>
@@ -1434,7 +1455,7 @@ async function loadDriverRun(driverName) {
   });
 
   html += `<div class="section-label">Drops</div>`;
-  sortStops(drops).forEach(([loc, locItems]) => {
+  sortStopsBy(drops, 'drop_stop_order').forEach(([loc, locItems]) => {
     html += `<div class="card stop-card stop-drop" draggable="${!currentDriverIsLocked}" data-stop-group="drop" data-stop-loc="${esc(loc)}">
       ${currentDriverIsLocked ? '' : '<div class="stop-drag-handle"><span class="grip">⠿⠿</span> Drag to reorder</div>'}
       <div class="stop-name">🎯 ${esc(loc)}</div>
@@ -1548,11 +1569,15 @@ function attachTouchDragHandlers(container, cards) {
   });
 }
 
-// Persists a new stop_order: moves dragSrc's stop to sit just before targetCard's stop, within the same group.
-// Also writes the new order into route_positions so it's "learned" — the change survives into next week's
-// run automatically, rather than only applying to this week.
+// Persists a new order for one section (Pickups or Drops) only — moves dragSrc's stop to
+// sit just before targetCard's stop, within the same group. Writes to pickup_stop_order when
+// reordering Pickups, or drop_stop_order when reordering Drops; these are two independent
+// columns so reordering one section can never disturb the other, even when a location plays
+// both roles for this driver (e.g. picking up bread there, then dropping empty crates back).
+// Also writes the new order into route_positions (tagged with the same role) so it's "learned"
+// — the change survives into next week's run automatically, rather than only applying to this week.
 async function reorderStops(dragSrcCard, targetCard) {
-  const group = dragSrcCard.dataset.stopGroup;
+  const group = dragSrcCard.dataset.stopGroup; // 'pickup' or 'drop'
   const container = document.getElementById('driver-stops');
   const groupCards = [...container.querySelectorAll('.stop-card[data-stop-group="' + group + '"]')];
 
@@ -1565,8 +1590,10 @@ async function reorderStops(dragSrcCard, targetCard) {
   const [moved] = reordered.splice(fromIdx, 1);
   reordered.splice(toIdx, 0, moved);
 
-  // Assign fresh sequential stop_order values (10, 20, 30...) and persist per-location
+  // Assign fresh sequential order values (10, 20, 30...) and persist per-location,
+  // writing only to the column for this group's role — never the other one.
   const locField = group === 'pickup' ? 'pickup_from' : 'drop_to';
+  const orderField = group === 'pickup' ? 'pickup_stop_order' : 'drop_stop_order';
   const updates = reordered.map((card, idx) => ({
     loc: card.dataset.stopLoc,
     order: (idx + 1) * 10
@@ -1575,19 +1602,21 @@ async function reorderStops(dragSrcCard, targetCard) {
   toast('Saving new order...');
   for (const u of updates) {
     await db.from('items')
-      .update({ stop_order: u.order })
+      .update({ [orderField]: u.order })
       .eq('run_id', currentDriverRunObj.id)
       .eq('driver', currentDriverName)
       .eq(locField, u.loc);
 
-    // Learn this order for the driver's route so it carries forward to future runs
+    // Learn this order for the driver's route so it carries forward to future runs —
+    // tagged with the same role (group), so it never bleeds into the other sequence.
     await db.from('route_positions').upsert({
       driver: currentDriverName,
       location_name: u.loc,
+      stop_type: group,
       position: u.order,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'driver,location_name' });
-    routePositionCache[routeCacheKey(currentDriverName, u.loc)] = u.order;
+    }, { onConflict: 'driver,location_name,stop_type' });
+    routePositionCache[routeCacheKey(currentDriverName, u.loc, group)] = u.order;
   }
   toast('Order updated ✓ — remembered for next week too');
   loadDriverRun(currentDriverName);
@@ -1729,9 +1758,9 @@ async function loadHubView(hubName) {
   document.getElementById('hub-run-meta').textContent = fmtDate(run.run_date) + (run.name ? ' · ' + run.name : '');
 
   // Inbound = drop_to is this hub
-  const { data: inbound } = await db.from('items').select('*').eq('run_id', run.id).eq('drop_to', hubName).order('stop_order', { ascending: true, nullsFirst: false });
+  const { data: inbound } = await db.from('items').select('*').eq('run_id', run.id).eq('drop_to', hubName).order('drop_stop_order', { ascending: true, nullsFirst: false });
   // Outbound = pickup_from is this hub
-  const { data: outbound } = await db.from('items').select('*').eq('run_id', run.id).eq('pickup_from', hubName).order('stop_order', { ascending: true, nullsFirst: false });
+  const { data: outbound } = await db.from('items').select('*').eq('run_id', run.id).eq('pickup_from', hubName).order('pickup_stop_order', { ascending: true, nullsFirst: false });
 
   // --- DRIVER COMPLETION STATUS --- which driver(s) touch this hub, and have they finished their run?
   const relevantDrivers = [...new Set([...(inbound || []), ...(outbound || [])].map(i => i.driver).filter(Boolean))];
@@ -2280,7 +2309,8 @@ async function confirmImport() {
 
   const rows = [];
   for (const item of parsedItems) {
-    const stopOrder = await resolveStopOrder(item.driver, item.pickup_from);
+    const pickupOrder = await resolveStopOrder(item.driver, item.pickup_from, 'pickup');
+    const dropOrder = await resolveStopOrder(item.driver, item.drop_to, 'drop');
     rows.push({
       run_id: currentRunId,
       description: item.description,
@@ -2290,7 +2320,8 @@ async function confirmImport() {
       driver: item.driver,
       notes: item.notes || '',
       status: 'pending',
-      stop_order: stopOrder
+      pickup_stop_order: pickupOrder,
+      drop_stop_order: dropOrder
     });
   }
 
